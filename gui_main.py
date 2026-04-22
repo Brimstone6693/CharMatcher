@@ -41,6 +41,9 @@ class MainWindow(tk.Tk):
         create_button = ttk.Button(frame, text="Create New Character", command=self.on_create_clicked)
         create_button.pack(pady=5)
 
+        manage_bodies_button = ttk.Button(frame, text="Manage Body Types", command=self.show_manage_bodies_screen)
+        manage_bodies_button.pack(pady=5)
+
     def on_load_clicked(self):
         """Обработчик кнопки Load."""
         # Открываем диалог выбора файла
@@ -232,6 +235,180 @@ class MainWindow(tk.Tk):
                 messagebox.showinfo("Save Success", f"Character saved to:\n{file_path}")
             except Exception as e:
                 messagebox.showerror("Save Error", f"Failed to save character:\n{e}")
+
+    def show_manage_bodies_screen(self):
+        """Показывает экран управления типами тел (добавление новых)."""
+        # Очищаем предыдущее содержимое
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        frame = ttk.Frame(self)
+        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        ttk.Label(frame, text="Manage Body Types", font=("Arial", 14, "bold")).pack(pady=10)
+
+        # Форма добавления нового типа тела
+        form_frame = ttk.LabelFrame(frame, text="Add New Body Type")
+        form_frame.pack(fill=tk.X, pady=10, padx=10)
+
+        # Имя класса (например, InsectoidBody)
+        ttk.Label(form_frame, text="Class Name (e.g., InsectoidBody):").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.new_body_class_name_entry = ttk.Entry(form_frame)
+        self.new_body_class_name_entry.grid(row=0, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+
+        # Отображаемое имя (например, Insectoid)
+        ttk.Label(form_frame, text="Display Name (e.g., Insectoid):").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.new_body_display_name_entry = ttk.Entry(form_frame)
+        self.new_body_display_name_entry.grid(row=1, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+
+        # Размер по умолчанию
+        ttk.Label(form_frame, text="Default Size:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.new_body_size_var = tk.StringVar(value="Medium")
+        size_combo = ttk.Combobox(form_frame, textvariable=self.new_body_size_var, values=["Tiny", "Small", "Medium", "Large", "Huge"], state="readonly")
+        size_combo.grid(row=2, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+
+        # Пол (опционально)
+        ttk.Label(form_frame, text="Default Gender (optional, leave empty for N/A):").grid(row=3, column=0, sticky=tk.W, pady=5)
+        self.new_body_gender_entry = ttk.Entry(form_frame)
+        self.new_body_gender_entry.grid(row=3, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+
+        # Части тела (через запятую)
+        ttk.Label(form_frame, text="Body Parts (comma-separated, e.g., head, torso, wing_left, wing_right):").grid(row=4, column=0, sticky=tk.W, pady=5)
+        self.new_body_parts_entry = ttk.Entry(form_frame)
+        self.new_body_parts_entry.grid(row=4, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+
+        # Описание внешности (шаблон)
+        ttk.Label(form_frame, text="Appearance Description Template (use {size}, {gender}, {race}):").grid(row=5, column=0, sticky=tk.W, pady=5)
+        self.new_body_desc_template_entry = ttk.Entry(form_frame, width=60)
+        self.new_body_desc_template_entry.grid(row=5, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+        ttk.Label(form_frame, text="Example: A {size} {gender} {race} with an insectoid body.").grid(row=6, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
+
+        # Кнопка создания
+        create_btn = ttk.Button(form_frame, text="Create Body Type", command=self.on_create_body_type_clicked)
+        create_btn.grid(row=7, column=0, columnspan=2, pady=15)
+
+        # Список существующих типов тел
+        list_frame = ttk.LabelFrame(frame, text="Existing Body Types")
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=10, padx=10)
+
+        self.bodies_listbox = tk.Listbox(list_frame)
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.bodies_listbox.yview)
+        self.bodies_listbox.configure(yscrollcommand=scrollbar.set)
+
+        self.bodies_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Заполняем список
+        self.refresh_bodies_list()
+
+        # Кнопка назад
+        back_btn = ttk.Button(frame, text="Back to Start", command=self.show_start_screen)
+        back_btn.pack(pady=5)
+
+    def refresh_bodies_list(self):
+        """Обновляет список отображаемых типов тел в ListBox."""
+        self.bodies_listbox.delete(0, tk.END)
+        for body_name in sorted(self.available_bodies.keys()):
+            self.bodies_listbox.insert(tk.END, body_name)
+
+    def on_create_body_type_clicked(self):
+        """Обработчик создания нового типа тела через интерфейс."""
+        class_name = self.new_body_class_name_entry.get().strip()
+        display_name = self.new_body_display_name_entry.get().strip()
+        default_size = self.new_body_size_var.get().strip()
+        default_gender = self.new_body_gender_entry.get().strip()
+        body_parts_str = self.new_body_parts_entry.get().strip()
+        desc_template = self.new_body_desc_template_entry.get().strip()
+
+        # Валидация
+        if not class_name:
+            messagebox.showwarning("Invalid Input", "Class Name is required.")
+            return
+        if not class_name.endswith("Body"):
+             messagebox.showwarning("Invalid Input", "Class Name should end with 'Body' (e.g., InsectoidBody).")
+             return
+        if not display_name:
+            display_name = class_name.replace("Body", "")
+        if not body_parts_str:
+            messagebox.showwarning("Invalid Input", "Body Parts are required (comma-separated).")
+            return
+        if not desc_template:
+            messagebox.showwarning("Invalid Input", "Appearance Description Template is required.")
+            return
+
+        # Проверка на дубликат
+        if class_name in self.available_bodies:
+            messagebox.showwarning("Duplicate", f"A body type with class name '{class_name}' already exists.")
+            return
+
+        # Парсинг частей тела
+        body_parts = [part.strip() for part in body_parts_str.split(',') if part.strip()]
+        if not body_parts:
+            messagebox.showwarning("Invalid Input", "Please provide at least one valid body part.")
+            return
+
+        # Генерация кода для нового файла тела
+        # Используем простой шаблон, предполагая, что у всех тел есть race, size, gender (опционально)
+        has_gender = bool(default_gender)
+        
+        code_lines = [
+            f"# file: bodies/{class_name.lower()}.py",
+            "from body import AbstractBody",
+            "",
+            f"class {class_name}(AbstractBody):",
+            "    def __init__(self, race=\"Custom\", size=\"" + default_size + "\"" + (f", gender=\"{default_gender}\"" if has_gender else "") + "):",
+            "        super().__init__(race, size)",
+        ]
+        
+        if has_gender:
+            code_lines.append("        self.gender = gender")
+        
+        code_lines.append(f"        self.body_parts = {body_parts}")
+        code_lines.append("")
+        
+        # Формируем описание
+        # Заменяем плейсхолдеры в шаблоне на атрибуты объекта
+        # Шаблон пользователя: "A {size} {gender} {race} with an insectoid body."
+        # В коде будет: return f"A {self.size} {self.gender} {self.race} with an insectoid body."
+        desc_code = desc_template.replace("{size}", "{self.size}").replace("{gender}", "{self.gender}").replace("{race}", "{self.race}")
+        code_lines.append(f"    def describe_appearance(self):")
+        code_lines.append(f"        return f\"{desc_code}\"")
+        code_lines.append("")
+
+        new_code = "\n".join(code_lines)
+
+        # Сохранение файла
+        filename = f"{class_name.lower()}.py"
+        filepath = os.path.join("bodies", filename)
+        
+        # Создаем директорию bodies если нет (на всякий случай)
+        os.makedirs("bodies", exist_ok=True)
+
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(new_code)
+            print(f"GUI: Created new body type file: {filepath}")
+            
+            # Перезагрузка списка доступных тел
+            # Просто заново вызываем загрузчик
+            self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
+            print(f"GUI: Reloaded modules. Now have {len(self.available_bodies)} bodies.")
+            
+            # Обновляем список в интерфейсе
+            self.refresh_bodies_list()
+            
+            # Очищаем поля формы
+            self.new_body_class_name_entry.delete(0, tk.END)
+            self.new_body_display_name_entry.delete(0, tk.END)
+            self.new_body_gender_entry.delete(0, tk.END)
+            self.new_body_parts_entry.delete(0, tk.END)
+            self.new_body_desc_template_entry.delete(0, tk.END)
+            self.new_body_size_var.set("Medium")
+
+            messagebox.showinfo("Success", f"Successfully created new body type '{class_name}'!\nIt is now available for selection.")
+            
+        except Exception as e:
+            messagebox.showerror("Creation Error", f"Failed to create body type file:\n{e}")
 
 
 if __name__ == "__main__":
