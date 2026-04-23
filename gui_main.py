@@ -272,20 +272,21 @@ class MainWindow(tk.Tk):
         self.new_body_gender_entry = ttk.Entry(form_frame)
         self.new_body_gender_entry.grid(row=3, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
 
-        # Части тела (через запятую)
-        ttk.Label(form_frame, text="Body Parts (comma-separated, e.g., head, torso, wing_left, wing_right):").grid(row=4, column=0, sticky=tk.W, pady=5)
-        self.new_body_parts_entry = ttk.Entry(form_frame)
-        self.new_body_parts_entry.grid(row=4, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
-
+        # Части тела (иерархический формат)
+        ttk.Label(form_frame, text="Body Parts Hierarchy (format: parent:child or just part for root):").grid(row=4, column=0, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Example: head:eyes, head:ears, mouth:teeth, torso (each on new line or semicolon separated)").grid(row=5, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
+        self.new_body_parts_entry = tk.Text(form_frame, height=6, width=50)
+        self.new_body_parts_entry.grid(row=6, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+        
         # Описание внешности (шаблон)
-        ttk.Label(form_frame, text="Appearance Description Template (use {size}, {gender}, {race}):").grid(row=5, column=0, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Appearance Description Template (use {size}, {gender}, {race}):").grid(row=7, column=0, sticky=tk.W, pady=5)
         self.new_body_desc_template_entry = ttk.Entry(form_frame, width=60)
-        self.new_body_desc_template_entry.grid(row=5, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
-        ttk.Label(form_frame, text="Example: A {size} {gender} {race} with an insectoid body.").grid(row=6, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
+        self.new_body_desc_template_entry.grid(row=7, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+        ttk.Label(form_frame, text="Example: A {size} {gender} {race} with an insectoid body.").grid(row=8, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
 
         # Кнопка создания
         create_btn = ttk.Button(form_frame, text="Create Body Type", command=self.on_create_body_type_clicked)
-        create_btn.grid(row=7, column=0, columnspan=2, pady=15)
+        create_btn.grid(row=9, column=0, columnspan=2, pady=15)
 
         # Список существующих типов тел
         list_frame = ttk.LabelFrame(frame, text="Existing Body Types")
@@ -317,7 +318,7 @@ class MainWindow(tk.Tk):
         display_name = self.new_body_display_name_entry.get().strip()
         default_size = self.new_body_size_var.get().strip()
         default_gender = self.new_body_gender_entry.get().strip()
-        body_parts_str = self.new_body_parts_entry.get().strip()
+        body_parts_text = self.new_body_parts_entry.get("1.0", tk.END).strip()
         desc_template = self.new_body_desc_template_entry.get().strip()
 
         # Валидация
@@ -329,8 +330,8 @@ class MainWindow(tk.Tk):
              return
         if not display_name:
             display_name = class_name.replace("Body", "")
-        if not body_parts_str:
-            messagebox.showwarning("Invalid Input", "Body Parts are required (comma-separated).")
+        if not body_parts_text:
+            messagebox.showwarning("Invalid Input", "Body Parts are required.")
             return
         if not desc_template:
             messagebox.showwarning("Invalid Input", "Appearance Description Template is required.")
@@ -341,10 +342,49 @@ class MainWindow(tk.Tk):
             messagebox.showwarning("Duplicate", f"A body type with class name '{class_name}' already exists.")
             return
 
-        # Парсинг частей тела
-        body_parts = [part.strip() for part in body_parts_str.split(',') if part.strip()]
-        if not body_parts:
-            messagebox.showwarning("Invalid Input", "Please provide at least one valid body part.")
+        # Парсинг иерархии частей тела
+        # Формат: parent:child или просто part (для корневых)
+        # Разделители: запятая, точка с запятой, новая строка
+        body_structure = {None: []}
+        
+        # Заменяем новые строки на точки с запятой для единообразия
+        parts_lines = body_parts_text.replace('\n', ';').split(';')
+        
+        for line in parts_lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            if ':' in line:
+                parent, child = line.split(':', 1)
+                parent = parent.strip()
+                child = child.strip()
+                
+                if not parent or not child:
+                    continue
+                
+                # Добавляем родителя в корень если он ещё не добавлен никуда
+                if parent not in body_structure and parent not in [p for children in body_structure.values() for p in children]:
+                    body_structure[None].append(parent)
+                    body_structure[parent] = []
+                elif parent not in body_structure:
+                    body_structure[parent] = []
+                
+                # Добавляем ребенка к родителю
+                if child not in body_structure[parent]:
+                    body_structure[parent].append(child)
+                    if child not in body_structure:
+                        body_structure[child] = []
+            else:
+                # Корневая часть без родителя
+                part = line.strip()
+                if part and part not in body_structure[None]:
+                    body_structure[None].append(part)
+                    if part not in body_structure:
+                        body_structure[part] = []
+
+        if not body_structure[None]:
+            messagebox.showwarning("Invalid Input", "Please provide at least one root body part.")
             return
 
         # Генерация кода для нового файла тела
@@ -363,7 +403,9 @@ class MainWindow(tk.Tk):
         if has_gender:
             code_lines.append("        self.gender = gender")
         
-        code_lines.append(f"        self.body_parts = {body_parts}")
+        # Форматируем body_structure для вывода в коде
+        structure_str = str(body_structure).replace("'", '"')
+        code_lines.append(f"        self.body_structure = {structure_str}")
         code_lines.append("")
         
         # Формируем описание
@@ -401,7 +443,7 @@ class MainWindow(tk.Tk):
             self.new_body_class_name_entry.delete(0, tk.END)
             self.new_body_display_name_entry.delete(0, tk.END)
             self.new_body_gender_entry.delete(0, tk.END)
-            self.new_body_parts_entry.delete(0, tk.END)
+            self.new_body_parts_entry.delete("1.0", tk.END)
             self.new_body_desc_template_entry.delete(0, tk.END)
             self.new_body_size_var.set("Medium")
 
