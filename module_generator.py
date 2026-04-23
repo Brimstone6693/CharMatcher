@@ -44,13 +44,19 @@ class {class_name}(AbstractBody):
         super().__init__(race, size)
         # Добавьте сюда атрибуты вашего тела
         self.gender = gender
-        self.body_parts = ["custom_part1", "custom_part2"] # Пример
+        # Инициализируем иерархическую структуру частей тела
+        # Формат: {{parent: [child1, child2, ...], None: [корневые части]}}
+        # Пример: {{None: ["head", "torso"], "head": ["eyes", "mouth"], "mouth": ["teeth"]}}
+        self.body_structure = {{
+            None: ["custom_part1", "custom_part2"],
+            "custom_part1": []
+        }}
         # Пример: self.wingspan = kwargs.get("wingspan", 0)
         # Пример: self.has_fur = kwargs.get("has_fur", False)
 
     def describe_appearance(self):
         # Верните строку с описанием тела
-        return f"A {self.size} {self.gender} {self.race} with a custom {self.__class__.__name__.lower()} body plan, featuring {len(self.body_parts)} distinct parts."
+        return f"A {{self.size}} {{self.gender}} {{self.race}} with a custom {{self.__class__.__name__.lower()}} body plan, featuring {{len(self.get_all_parts())}} distinct parts."
 
     # Методы to_dict и from_dict наследуются из AbstractBody, если не переопределяете специфичное поведение
     # def to_dict(self):
@@ -58,7 +64,6 @@ class {class_name}(AbstractBody):
     #     data = super().to_dict()
     #     data.update({{
     #         "gender": self.gender,
-    #         "body_parts": self.body_parts,
     #         # "wingspan": self.wingspan,
     #         # "has_fur": self.has_fur,
     #     }})
