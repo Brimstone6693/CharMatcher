@@ -4,7 +4,7 @@ from tkinter import ttk, messagebox, filedialog
 import os
 import json
 from character import Character
-from module_loader import load_available_modules_and_bodies
+from module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
 from body import AbstractBody
 from components import BaseComponent
 
@@ -680,52 +680,31 @@ class MainWindow(tk.Tk):
         # Используем текущую структуру напрямую
         body_structure = dict(self.current_body_structure)
 
-        # Генерация кода для нового файла тела
-        # Используем простой шаблон, предполагая, что у всех тел есть race, size, gender (опционально)
-        has_gender = bool(default_gender)
-        
-        code_lines = [
-            f"# file: bodies/{class_name.lower()}.py",
-            "from body import AbstractBody",
-            "",
-            f"class {class_name}(AbstractBody):",
-            "    def __init__(self, race=\"Custom\", size=\"" + default_size + "\"" + (f", gender=\"{default_gender}\"" if has_gender else "") + "):",
-            "        super().__init__(race, size)",
-        ]
-        
-        if has_gender:
-            code_lines.append("        self.gender = gender")
-        
-        # Форматируем body_structure для вывода в коде
-        structure_str = str(body_structure).replace("'", '"')
-        code_lines.append(f"        self.body_structure = {structure_str}")
-        code_lines.append("")
-        
-        # Формируем описание
         # Если шаблон пустой, используем дефолтный
         if not desc_template:
             desc_template = f"A {{size}} {{gender}} {display_name}."
         
-        # Заменяем плейсхолдеры в шаблоне на атрибуты объекта
-        # Шаблон пользователя: "A {size} {gender} {race} with an insectoid body."
-        # В коде будет: return f"A {self.size} {self.gender} {self.race} with an insectoid body."
-        desc_code = desc_template.replace("{size}", "{self.size}").replace("{gender}", "{self.gender}").replace("{race}", "{self.race}")
-        code_lines.append(f"    def describe_appearance(self):")
-        code_lines.append(f"        return f\"{desc_code}\"")
-        code_lines.append("")
+        # Создаем словарь данных для JSON
+        body_data = {
+            "class_name": class_name,
+            "race": "Custom",
+            "size": default_size,
+            "gender": default_gender if default_gender else "N/A",
+            "display_name": display_name,
+            "description_template": desc_template,
+            "body_structure": body_structure
+        }
 
-        new_code = "\n".join(code_lines)
-
-        # Сохранение файла
-        filename = f"{class_name.lower()}.py"
-        filepath = os.path.join("bodies", filename)
+        # Сохранение файла JSON
+        filename = f"{class_name.lower()}.json"
+        filepath = os.path.join(BODIES_DATA_DIR, filename)
         
-        # Создаем директорию bodies если нет (на всякий случай)
-        os.makedirs("bodies", exist_ok=True)
+        # Создаем директорию bodies_data если нет
+        os.makedirs(BODIES_DATA_DIR, exist_ok=True)
 
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(new_code)
+                json.dump(body_data, f, indent=4, ensure_ascii=False)
             print(f"GUI: Created new body type file: {filepath}")
             
             # Перезагрузка списка доступных тел
@@ -773,72 +752,48 @@ class MainWindow(tk.Tk):
             return
         
         body_name = self.bodies_listbox.get(selection[0])
-        # Получаем путь к файлу тела
-        filename = f"{body_name.lower()}.py"
-        filepath = os.path.join("bodies", filename)
+        # Получаем путь к файлу тела (JSON)
+        filename = f"{body_name.lower()}.json"
+        filepath = os.path.join(BODIES_DATA_DIR, filename)
         
         if not os.path.exists(filepath):
             messagebox.showerror("Error", f"File for '{body_name}' not found at {filepath}.")
             return
         
         try:
-            # Динамически загружаем модуль
-            import importlib.util
-            spec = importlib.util.spec_from_file_location(body_name, filepath)
-            module = importlib.util.module_from_spec(spec)
-            
-            # Проверяем, не является ли класс встроенным
-            # Если файл содержит определение класса, загружаем его
+            # Загружаем данные из JSON
             with open(filepath, 'r', encoding='utf-8') as f:
-                source_code = f.read()
-            
-            # Выполняем код модуля в безопасном контексте
-            exec(source_code, module.__dict__)
-            
-            # Получаем класс из модуля
-            body_class = getattr(module, body_name, None)
-            
-            if not body_class:
-                messagebox.showerror("Error", f"Could not find class '{body_name}' in the module.")
-                return
-            
-            # Создаем экземпляр для получения данных
-
-            if hasattr(body_class, '__init__') and 'gender' in body_class.__init__.__code__.co_varnames:
-                instance = body_class(race=body_name.replace("Body", ""), gender="N/A")
-            else:
-                instance = body_class(race=body_name.replace("Body", ""))
+                data = json.load(f)
             
             # Заполняем поля формы
             self.new_body_class_name_entry.delete(0, tk.END)
-            self.new_body_class_name_entry.insert(0, body_name)
+            self.new_body_class_name_entry.insert(0, data.get("class_name", body_name))
             
-            display_name = body_name.replace("Body", "")
+            display_name = data.get("display_name", body_name.replace("Body", ""))
             self.new_body_display_name_entry.delete(0, tk.END)
             self.new_body_display_name_entry.insert(0, display_name)
             
-            self.new_body_size_var.set(getattr(instance, 'size', 'Medium'))
+            self.new_body_size_var.set(data.get('size', 'Medium'))
             
-            if hasattr(instance, 'gender'):
+            gender = data.get('gender', '')
+            if gender and gender != "N/A":
                 self.new_body_gender_entry.delete(0, tk.END)
-                self.new_body_gender_entry.insert(0, getattr(instance, 'gender', ''))
+                self.new_body_gender_entry.insert(0, gender)
+            else:
+                self.new_body_gender_entry.delete(0, tk.END)
             
             # Загружаем структуру частей тела
-            if hasattr(instance, 'body_structure'):
-                self.current_body_structure = dict(instance.body_structure)
-                self.update_body_parts_tree()
+            body_structure = data.get('body_structure', {})
+            # Конвертируем ключ "None" из строки обратно в None
+            if "None" in body_structure:
+                body_structure[None] = body_structure.pop("None")
+            self.current_body_structure = body_structure
+            self.update_body_parts_tree()
             
-            # Пытаемся получить шаблон описания из исходного кода
-
-            import re
-            match = re.search(r'return\s+f["\'](.+?)["\']', source_code, re.DOTALL)
-
-            if match:
-                desc_template = match.group(1)
-                # Восстанавливаем плейсхолдеры
-                desc_template = desc_template.replace("{self.size}", "{size}").replace("{self.gender}", "{gender}").replace("{self.race}", "{race}")
-                self.new_body_desc_template_entry.delete(0, tk.END)
-                self.new_body_desc_template_entry.insert(0, desc_template)
+            # Загружаем шаблон описания
+            desc_template = data.get('description_template', '')
+            self.new_body_desc_template_entry.delete(0, tk.END)
+            self.new_body_desc_template_entry.insert(0, desc_template)
             
             messagebox.showinfo("Loaded", f"Loaded '{body_name}' into editor.\nYou can now modify and save it as a new type.")
             
@@ -884,9 +839,9 @@ class MainWindow(tk.Tk):
                 messagebox.showwarning("Duplicate", f"A body type with class name '{new_name}' already exists.", parent=dialog)
                 return
 
-            # Загружаем данные старого тела из файла
-            filename = f"{old_name.lower()}.py"
-            filepath = os.path.join("bodies", filename)
+            # Загружаем данные старого тела из JSON файла
+            filename = f"{old_name.lower()}.json"
+            filepath = os.path.join(BODIES_DATA_DIR, filename)
             
             if not os.path.exists(filepath):
                 messagebox.showerror("Error", f"File for '{old_name}' not found at {filepath}.")
@@ -894,67 +849,21 @@ class MainWindow(tk.Tk):
             
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
-                    source_code = f.read()
+                    data = json.load(f)
                 
-                import importlib.util
-                spec = importlib.util.spec_from_file_location(old_name, filepath)
-                module = importlib.util.module_from_spec(spec)
-                exec(source_code, module.__dict__)
-                
-                body_class = getattr(module, old_name, None)
-                if not body_class:
-                    messagebox.showerror("Error", f"Could not find class '{old_name}' in the module.")
-                    return
-
-                if hasattr(body_class, '__init__') and 'gender' in body_class.__init__.__code__.co_varnames:
-                    instance = body_class(race=old_name.replace("Body", ""), gender="N/A")
-                else:
-                    instance = body_class(race=old_name.replace("Body", ""))
-                
-                # Генерируем новый код с новым именем
-                body_structure = dict(instance.body_structure)
-                structure_str = str(body_structure).replace("'", '"')
-
-                # Получаем шаблон описания из исходного кода
-                import re
-                match = re.search(r'return\\s+f["\'](.+?)["\']', source_code, re.DOTALL)
-
-                desc_code = match.group(1) if match else f"A {{self.size}} {{self.gender}} {new_name.replace('Body', '')}."
-                
-                has_gender = hasattr(instance, 'gender')
-                default_gender = getattr(instance, 'gender', '')
-                default_size = getattr(instance, 'size', 'Medium')
-                
-                code_lines = [
-                    f"# file: bodies/{new_name.lower()}.py",
-                    "from body import AbstractBody",
-                    "",
-                    f"class {new_name}(AbstractBody):",
-                    "    def __init__(self, race=\"Custom\", size=\"" + default_size + "\"" + (f", gender=\"{default_gender}\"" if has_gender else "") + "):",
-                    "        super().__init__(race, size)",
-                ]
-                
-                if has_gender:
-                    code_lines.append("        self.gender = gender")
-                
-                code_lines.append(f"        self.body_structure = {structure_str}")
-                code_lines.append("")
-                code_lines.append(f"    def describe_appearance(self):")
-                code_lines.append(f"        return f\"{desc_code}\"")
-                code_lines.append("")
-                
-                new_code = "\n".join(code_lines)
+                # Обновляем имя класса
+                data["class_name"] = new_name
                 
                 # Сохраняем новый файл
-                filename = f"{new_name.lower()}.py"
-                filepath = os.path.join("bodies", filename)
+                filename = f"{new_name.lower()}.json"
+                filepath = os.path.join(BODIES_DATA_DIR, filename)
                 
                 with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(new_code)
+                    json.dump(data, f, indent=4, ensure_ascii=False)
                 
                 # Удаляем старый файл
-                old_filename = f"{old_name.lower()}.py"
-                old_filepath = os.path.join("bodies", old_filename)
+                old_filename = f"{old_name.lower()}.json"
+                old_filepath = os.path.join(BODIES_DATA_DIR, old_filename)
                 if os.path.exists(old_filepath):
                     os.remove(old_filepath)
                 
@@ -1010,9 +919,9 @@ class MainWindow(tk.Tk):
                 return
             
 
-            # Загружаем данные старого тела из файла
-            filename = f"{old_name.lower()}.py"
-            filepath = os.path.join("bodies", filename)
+            # Загружаем данные старого тела из JSON файла
+            filename = f"{old_name.lower()}.json"
+            filepath = os.path.join(BODIES_DATA_DIR, filename)
             
             if not os.path.exists(filepath):
                 messagebox.showerror("Error", f"File for '{old_name}' not found at {filepath}.")
@@ -1020,63 +929,18 @@ class MainWindow(tk.Tk):
             
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
-                    source_code = f.read()
+                    data = json.load(f)
                 
-                import importlib.util
-                spec = importlib.util.spec_from_file_location(old_name, filepath)
-                module = importlib.util.module_from_spec(spec)
-                exec(source_code, module.__dict__)
-                
-                body_class = getattr(module, old_name, None)
-                if not body_class:
-                    messagebox.showerror("Error", f"Could not find class '{old_name}' in the module.")
-                    return
-
-                if hasattr(body_class, '__init__') and 'gender' in body_class.__init__.__code__.co_varnames:
-                    instance = body_class(race=old_name.replace("Body", ""), gender="N/A")
-                else:
-                    instance = body_class(race=old_name.replace("Body", ""))
-                
-                # Генерируем новый код
-                body_structure = dict(instance.body_structure)
-                structure_str = str(body_structure).replace("'", '"')
-                
-
-                import re
-                match = re.search(r'return\\s+f["\'](.+?)["\']', source_code, re.DOTALL)
-
-                desc_code = match.group(1) if match else f"A {{self.size}} {{self.gender}} {new_name.replace('Body', '')}."
-                
-                has_gender = hasattr(instance, 'gender')
-                default_gender = getattr(instance, 'gender', '')
-                default_size = getattr(instance, 'size', 'Medium')
-                
-                code_lines = [
-                    f"# file: bodies/{new_name.lower()}.py",
-                    "from body import AbstractBody",
-                    "",
-                    f"class {new_name}(AbstractBody):",
-                    "    def __init__(self, race=\"Custom\", size=\"" + default_size + "\"" + (f", gender=\"{default_gender}\"" if has_gender else "") + "):",
-                    "        super().__init__(race, size)",
-                ]
-                
-                if has_gender:
-                    code_lines.append("        self.gender = gender")
-                
-                code_lines.append(f"        self.body_structure = {structure_str}")
-                code_lines.append("")
-                code_lines.append(f"    def describe_appearance(self):")
-                code_lines.append(f"        return f\"{desc_code}\"")
-                code_lines.append("")
-                
-                new_code = "\n".join(code_lines)
+                # Обновляем имя класса и display_name
+                data["class_name"] = new_name
+                data["display_name"] = new_name.replace("Body", "")
                 
                 # Сохраняем новый файл
-                filename = f"{new_name.lower()}.py"
-                filepath = os.path.join("bodies", filename)
+                filename = f"{new_name.lower()}.json"
+                filepath = os.path.join(BODIES_DATA_DIR, filename)
                 
                 with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(new_code)
+                    json.dump(data, f, indent=4, ensure_ascii=False)
                 
                 # Перезагружаем список тел
                 self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
@@ -1103,9 +967,9 @@ class MainWindow(tk.Tk):
             return
         
         try:
-            # Удаляем файл
-            filename = f"{body_name.lower()}.py"
-            filepath = os.path.join("bodies", filename)
+            # Удаляем файл JSON
+            filename = f"{body_name.lower()}.json"
+            filepath = os.path.join(BODIES_DATA_DIR, filename)
             
             if os.path.exists(filepath):
                 os.remove(filepath)

@@ -1,0 +1,30 @@
+{
+    "class_name": "LegacyDragonBody",
+    "race": "Legacy Dragon",
+    "size": "Huge",
+    "gender": "male",
+    "display_name": "Legacy Dragon",
+    "description_template": "A {size} {gender} {race}",
+    "body_structure": {
+        "None": [
+            {"name": "Torso", "tags": []}
+        ],
+        "Torso": [
+            {"name": "Wings", "tags": []},
+            {"name": "Paws", "tags": []},
+            {"name": "Head", "tags": []}
+        ],
+        "Paws": [
+            {"name": "Claws", "tags": []}
+        ],
+        "Head": [
+            {"name": "Maw", "tags": []}
+        ],
+        "Maw": [
+            {"name": "Teeth", "tags": []}
+        ],
+        "Wings": [],
+        "Claws": [],
+        "Teeth": []
+    }
+}
