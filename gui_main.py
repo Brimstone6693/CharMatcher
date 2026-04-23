@@ -369,8 +369,17 @@ class MainWindow(tk.Tk):
 
     def update_body_parts_tree(self):
         """Обновляет дерево частей тела на основе current_body_structure с сохранением состояния раскрытия."""
-        # Сохраняем текущее состояние раскрытия узлов
-        self.tree_expanded_items = set(self.body_parts_tree.item(item, "open") for item in self.body_parts_tree.get_children("") if self.body_parts_tree.item(item, "open"))
+        # Сохраняем текущее состояние раскрытия узлов по их именам
+        expanded_items = set()
+        for item in self.body_parts_tree.get_children(""):
+            if self.body_parts_tree.item(item, "open"):
+                item_text = self.body_parts_tree.item(item)["text"]
+                expanded_items.add(item_text)
+                # Сохраняем также детей этого узла
+                for child_item in self.body_parts_tree.get_children(item):
+                    if self.body_parts_tree.item(child_item, "open"):
+                        child_text = self.body_parts_tree.item(child_item)["text"]
+                        expanded_items.add(f"{item_text}::{child_text}")
         
         # Очищаем дерево
         for item in self.body_parts_tree.get_children():
@@ -379,16 +388,40 @@ class MainWindow(tk.Tk):
         # Рекурсивно добавляем узлы
         def add_children(parent_node_id, parent_key):
             children = self.current_body_structure.get(parent_key, [])
-            for child_name in children:
+            for child in children:
+                child_name = child["name"] if isinstance(child, dict) else child
+                child_tags = child.get("tags", []) if isinstance(child, dict) else []
+                
+                # Формируем текст для отображения с тегами
+                display_text = child_name
+                if child_tags:
+                    display_text += f" [{', '.join(child_tags)}]"
+                
                 # Добавляем узел в дерево
-                node_id = self.body_parts_tree.insert(parent_node_id, "end", text=child_name, values=(child_name,))
+                node_id = self.body_parts_tree.insert(parent_node_id, "end", text=display_text, values=(child_name,))
+                
+                # Проверяем, нужно ли раскрыть этот узел
+                parent_path = ""
+                if parent_key:
+                    parent_path = f"{parent_key}::"
+                item_path = f"{parent_path}{child_name}"
+                if item_path in expanded_items or (not parent_key and child_name in expanded_items):
+                    self.body_parts_tree.item(node_id, open=True)
+                
                 # Рекурсивно добавляем детей этого узла
                 add_children(node_id, child_name)
         
         # Начинаем с корневых элементов (ключ None)
         root_parts = self.current_body_structure.get(None, [])
-        for part_name in root_parts:
-            node_id = self.body_parts_tree.insert("", "end", text=part_name, values=(part_name,))
+        for part in root_parts:
+            part_name = part["name"] if isinstance(part, dict) else part
+            part_tags = part.get("tags", []) if isinstance(part, dict) else []
+            
+            display_text = part_name
+            if part_tags:
+                display_text += f" [{', '.join(part_tags)}]"
+            
+            node_id = self.body_parts_tree.insert("", "end", text=display_text, values=(part_name,))
             # Раскрываем корневые узлы по умолчанию
             self.body_parts_tree.item(node_id, open=True)
             add_children(node_id, part_name)
@@ -397,7 +430,7 @@ class MainWindow(tk.Tk):
         """Добавляет дочернюю часть к 'Body' (независимо от выбора пользователя)."""
         dialog = tk.Toplevel(self)
         dialog.title("Add Body Part")
-        dialog.geometry("300x100")
+        dialog.geometry("350x180")
         dialog.transient(self)
         dialog.grab_set()
         
@@ -406,19 +439,31 @@ class MainWindow(tk.Tk):
         entry.pack(pady=5)
         entry.focus()
         
+        ttk.Label(dialog, text="Tags (comma-separated, optional):").pack(pady=5)
+        tags_entry = ttk.Entry(dialog)
+        tags_entry.pack(pady=5)
+        
         def confirm():
             name = entry.get().strip()
             if not name:
                 messagebox.showwarning("Invalid Input", "Part name cannot be empty.", parent=dialog)
                 return
-            if name in self.current_body_structure:
-                messagebox.showwarning("Duplicate", f"Part '{name}' already exists.", parent=dialog)
-                return
+            
+            # Парсим теги
+            tags_input = tags_entry.get().strip()
+            tags = [t.strip() for t in tags_input.split(",") if t.strip()] if tags_input else []
             
             # Добавляем как дочернюю часть к 'Body'
             if "Body" not in self.current_body_structure:
                 self.current_body_structure["Body"] = []
-            self.current_body_structure["Body"].append(name)
+            
+            # Проверяем дубликаты
+            existing_names = [c["name"] if isinstance(c, dict) else c for c in self.current_body_structure["Body"]]
+            if name in existing_names:
+                messagebox.showwarning("Duplicate", f"Part '{name}' already exists.", parent=dialog)
+                return
+            
+            self.current_body_structure["Body"].append({"name": name, "tags": tags})
             self.current_body_structure[name] = []
             self.update_body_parts_tree()
             dialog.destroy()
@@ -433,11 +478,11 @@ class MainWindow(tk.Tk):
             return
         
         # Получаем имена всех выбранных родительских узлов
-        parent_names = [self.body_parts_tree.item(item)["text"] for item in selected]
+        parent_names = [self.body_parts_tree.item(item)["values"][0] for item in selected]
         
         dialog = tk.Toplevel(self)
         dialog.title(f"Add Child to {len(parent_names)} part(s)")
-        dialog.geometry("300x100")
+        dialog.geometry("350x180")
         dialog.transient(self)
         dialog.grab_set()
         
@@ -446,20 +491,29 @@ class MainWindow(tk.Tk):
         entry.pack(pady=5)
         entry.focus()
         
+        ttk.Label(dialog, text="Tags (comma-separated, optional):").pack(pady=5)
+        tags_entry = ttk.Entry(dialog)
+        tags_entry.pack(pady=5)
+        
         def confirm():
             name = entry.get().strip()
             if not name:
                 messagebox.showwarning("Invalid Input", "Part name cannot be empty.", parent=dialog)
                 return
-            if name in self.current_body_structure:
-                messagebox.showwarning("Duplicate", f"Part '{name}' already exists.", parent=dialog)
-                return
+            
+            # Парсим теги
+            tags_input = tags_entry.get().strip()
+            tags = [t.strip() for t in tags_input.split(",") if t.strip()] if tags_input else []
             
             # Добавляем как дочернюю часть ко всем выбранным родителям
             for parent_name in parent_names:
                 if parent_name not in self.current_body_structure:
                     self.current_body_structure[parent_name] = []
-                self.current_body_structure[parent_name].append(name)
+                
+                # Проверяем дубликаты у каждого родителя
+                existing_names = [c["name"] if isinstance(c, dict) else c for c in self.current_body_structure[parent_name]]
+                if name not in existing_names:
+                    self.current_body_structure[parent_name].append({"name": name, "tags": tags})
             
             self.current_body_structure[name] = []
             self.update_body_parts_tree()
@@ -474,23 +528,26 @@ class MainWindow(tk.Tk):
             messagebox.showwarning("No Selection", "Please select a part to delete.", parent=self)
             return
         
-        part_name = self.body_parts_tree.item(selected[0])["text"]
+        part_name = self.body_parts_tree.item(selected[0])["values"][0]
         
         if not messagebox.askyesno("Confirm Delete", f"Delete '{part_name}' and all its children?", parent=self):
             return
         
         # Удаляем из списка родителя
         for parent, children in list(self.current_body_structure.items()):
-            if part_name in children:
-                children.remove(part_name)
+            normalized_children = [c["name"] if isinstance(c, dict) else c for c in children]
+            if part_name in normalized_children:
+                idx = normalized_children.index(part_name)
+                children.pop(idx)
         
         # Рекурсивно собираем всех потомков для удаления
         def get_all_descendants(part):
             descendants = []
             children = self.current_body_structure.get(part, [])
             for child in children:
-                descendants.append(child)
-                descendants.extend(get_all_descendants(child))
+                child_name = child["name"] if isinstance(child, dict) else child
+                descendants.append(child_name)
+                descendants.extend(get_all_descendants(child_name))
             return descendants
         
         all_to_remove = [part_name] + get_all_descendants(part_name)
@@ -509,11 +566,11 @@ class MainWindow(tk.Tk):
             messagebox.showwarning("No Selection", "Please select a part to rename.", parent=self)
             return
         
-        old_name = self.body_parts_tree.item(selected[0])["text"]
+        old_name = self.body_parts_tree.item(selected[0])["values"][0]
         
         dialog = tk.Toplevel(self)
         dialog.title(f"Rename '{old_name}'")
-        dialog.geometry("300x100")
+        dialog.geometry("350x180")
         dialog.transient(self)
         dialog.grab_set()
         
@@ -524,36 +581,71 @@ class MainWindow(tk.Tk):
         entry.focus()
         entry.select_range(0, tk.END)
         
+        # Показываем текущие теги
+        current_tags = []
+        for parent, children in self.current_body_structure.items():
+            for child in children:
+                child_name = child["name"] if isinstance(child, dict) else child
+                if child_name == old_name:
+                    current_tags = child.get("tags", []) if isinstance(child, dict) else []
+                    break
+        
+        ttk.Label(dialog, text="Tags (comma-separated):").pack(pady=5)
+        tags_entry = ttk.Entry(dialog)
+        tags_entry.insert(0, ", ".join(current_tags))
+        tags_entry.pack(pady=5)
+        
         def confirm():
             new_name = entry.get().strip()
             if not new_name:
                 messagebox.showwarning("Invalid Input", "Part name cannot be empty.", parent=dialog)
                 return
-            if new_name == old_name:
+            if new_name == old_name and tags_entry.get().strip() == ", ".join(current_tags):
                 dialog.destroy()
                 return
-            if new_name in self.current_body_structure:
+            
+            # Проверяем дубликаты имен
+            all_names = self.get_all_part_names_from_structure()
+            if new_name != old_name and new_name in all_names:
                 messagebox.showwarning("Duplicate", f"Part '{new_name}' already exists.", parent=dialog)
                 return
             
+            # Парсим новые теги
+            tags_input = tags_entry.get().strip()
+            new_tags = [t.strip() for t in tags_input.split(",") if t.strip()] if tags_input else []
+            
             # Обновляем структуру
             # 1. Находим родителя и обновляем список детей
-            parent_key = None
             for p, children in self.current_body_structure.items():
-                if old_name in children:
-                    children[children.index(old_name)] = new_name
-                    parent_key = p
-                    break
+                for i, child in enumerate(children):
+                    child_name = child["name"] if isinstance(child, dict) else child
+                    if child_name == old_name:
+                        # Обновляем имя и теги
+                        if isinstance(child, dict):
+                            child["name"] = new_name
+                            child["tags"] = new_tags
+                        else:
+                            children[i] = {"name": new_name, "tags": new_tags}
+                        break
             
             # 2. Обновляем ключ в словаре (если это не None)
             if old_name in self.current_body_structure:
                 children_list = self.current_body_structure.pop(old_name)
+                # Обновляем имена родителей у детей этой части
                 self.current_body_structure[new_name] = children_list
             
             self.update_body_parts_tree()
             dialog.destroy()
         
         ttk.Button(dialog, text="Rename", command=confirm).pack(pady=5)
+
+    def get_all_part_names_from_structure(self):
+        """Возвращает все имена частей из текущей структуры."""
+        names = []
+        for children in self.current_body_structure.values():
+            for child in children:
+                names.append(child["name"] if isinstance(child, dict) else child)
+        return names
 
     def on_create_body_type_clicked(self):
         """Обработчик создания нового типа тела через интерфейс."""
