@@ -679,6 +679,10 @@ class MainWindow(tk.Tk):
 
         # Используем текущую структуру напрямую
         body_structure = dict(self.current_body_structure)
+        
+        # Конвертируем ключ None в строку "null" для JSON совместимости
+        if None in body_structure:
+            body_structure["null"] = body_structure.pop(None)
 
         # Если шаблон пустой, используем дефолтный
         if not desc_template:
@@ -784,9 +788,11 @@ class MainWindow(tk.Tk):
             
             # Загружаем структуру частей тела
             body_structure = data.get('body_structure', {})
-            # Конвертируем ключ "None" из строки обратно в None
-            if "None" in body_structure:
-                body_structure[None] = body_structure.pop("None")
+            # Конвертируем ключ "null" или "None" из строки обратно в None
+            for null_key in ["null", "None"]:
+                if null_key in body_structure:
+                    body_structure[None] = body_structure.pop(null_key)
+                    break
             
             # Также нужно нормализовать все части в списках до словарей {name, tags}
             for key in body_structure:
