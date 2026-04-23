@@ -32,17 +32,17 @@ class AbstractBody(ABC):
             if parent not in self.get_all_parts():
                 raise ValueError(f"Parent part '{parent}' does not exist.")
             self.body_structure[parent] = []
-        
+
         # Добавляем часть к родителю
         if parent not in self.body_structure:
             self.body_structure[parent] = []
-        
+
         if part_name not in self.body_structure[parent]:
             self.body_structure[parent].append(part_name)
             # Инициализируем запись для новой части (она может стать родителем)
             if part_name not in self.body_structure:
                 self.body_structure[part_name] = []
-        
+
         return True
 
     def remove_part(self, part_name):
@@ -51,11 +51,11 @@ class AbstractBody(ABC):
         for parent, children in list(self.body_structure.items()):
             if part_name in children:
                 children.remove(part_name)
-        
+
         # Удаляем запись о детях этой части
         if part_name in self.body_structure:
             del self.body_structure[part_name]
-        
+
         # Рекурсивно удаляем всех потомков
         # (они уже были удалены из списков детей при удалении part_name)
         return True
@@ -80,6 +80,53 @@ class AbstractBody(ABC):
             # Если тело не найдено, можно попробовать загрузить базовое тело или вызвать ошибку
             # Пока бросим ошибку, как в предыдущей версии
             raise ValueError(f"Unknown Body type: {class_name}")
+
+
+class DynamicBody(AbstractBody):
+    """Класс для динамической загрузки тел из JSON файлов."""
+    
+    def __init__(self, race="Unknown", size="Medium", gender="N/A", display_name="Unknown", description_template=None, **kwargs):
+        super().__init__(race, size)
+        self.gender = gender
+        self.display_name = display_name
+        self.description_template = description_template
+        # body_structure будет установлен через from_dict
+    
+    def describe_appearance(self):
+        if self.description_template:
+            try:
+                return self.description_template.format(size=self.size, gender=self.gender, race=self.race, display_name=self.display_name)
+            except KeyError:
+                return f"A {self.size} {self.gender} {self.display_name}."
+        return f"A {self.size} {self.gender} {self.display_name}."
+    
+    @classmethod
+    def from_dict(cls, data):
+        """Создает экземпляр DynamicBody из словаря данных JSON."""
+        instance = cls(
+            race=data.get("race", "Unknown"),
+            size=data.get("size", "Medium"),
+            gender=data.get("gender", "N/A"),
+            display_name=data.get("display_name", "Unknown"),
+            description_template=data.get("description_template")
+        )
+        if "body_structure" in data:
+            instance.body_structure = data["body_structure"]
+        return instance
+    
+    def to_dict(self):
+        """Сериализует тело в словарь для сохранения в JSON."""
+        base_dict = super().to_dict()
+        base_dict.update({
+            "gender": self.gender,
+            "display_name": self.display_name,
+            "description_template": self.description_template,
+            "class_name": self.__class__.__name__
+        })
+        # Удаляем __class__ так как мы используем class_name для JSON
+        base_dict.pop("__class__", None)
+        return base_dict
+
 
 # --- Пример конкретных тел ---
 class HumanoidBody(AbstractBody):
