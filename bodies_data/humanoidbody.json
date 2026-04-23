@@ -1,0 +1,29 @@
+{
+    "class_name": "HumanoidBody",
+    "race": "Human",
+    "size": "Medium",
+    "gender": "Male",
+    "display_name": "Humanoid",
+    "description_template": "A {size} {gender} {race} with a humanoid body.",
+    "body_structure": {
+        "None": [
+            {"name": "head", "tags": []},
+            {"name": "torso", "tags": []},
+            {"name": "left_arm", "tags": []},
+            {"name": "right_arm", "tags": []},
+            {"name": "left_leg", "tags": []},
+            {"name": "right_leg", "tags": []}
+        ],
+        "head": [
+            {"name": "eyes", "tags": []},
+            {"name": "ears", "tags": []},
+            {"name": "mouth", "tags": []},
+            {"name": "nose", "tags": []}
+        ],
+        "mouth": [
+            {"name": "teeth", "tags": []},
+            {"name": "tongue", "tags": []}
+        ],
+        "torso": []
+    }
+}
