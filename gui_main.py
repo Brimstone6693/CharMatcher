@@ -272,21 +272,53 @@ class MainWindow(tk.Tk):
         self.new_body_gender_entry = ttk.Entry(form_frame)
         self.new_body_gender_entry.grid(row=3, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
 
-        # Части тела (иерархический формат)
-        ttk.Label(form_frame, text="Body Parts Hierarchy (format: parent:child or just part for root):").grid(row=4, column=0, sticky=tk.W, pady=5)
-        ttk.Label(form_frame, text="Example: head:eyes, head:ears, mouth:teeth, torso (each on new line or semicolon separated)").grid(row=5, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
-        self.new_body_parts_entry = tk.Text(form_frame, height=6, width=50)
-        self.new_body_parts_entry.grid(row=6, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+        # Части тела (интерактивное дерево)
+        ttk.Label(form_frame, text="Body Parts Hierarchy:").grid(row=4, column=0, sticky=tk.W, pady=5)
+        
+        # Фрейм для дерева и кнопок
+        tree_frame = ttk.Frame(form_frame)
+        tree_frame.grid(row=5, column=1, sticky=tk.EW, pady=5, padx=(10, 0), rowspan=3)
+        
+        # Дерево для отображения иерархии
+        columns = ("name",)
+        self.body_parts_tree = ttk.Treeview(tree_frame, columns=columns, show="tree", height=8)
+        self.body_parts_tree.heading("#0", text="Body Parts")
+        self.body_parts_tree.column("#0", width=250)
+        
+        scrollbar_tree = ttk.Scrollbar(tree_frame, orient="vertical", command=self.body_parts_tree.yview)
+        self.body_parts_tree.configure(yscrollcommand=scrollbar_tree.set)
+        
+        self.body_parts_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_tree.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Кнопки управления деревом
+        btn_frame = ttk.Frame(form_frame)
+        btn_frame.grid(row=8, column=1, sticky=tk.W, pady=5, padx=(10, 0))
+        
+        add_root_btn = ttk.Button(btn_frame, text="Add Root Part", command=self.on_add_root_part)
+        add_root_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        add_child_btn = ttk.Button(btn_frame, text="Add Child Part", command=self.on_add_child_part)
+        add_child_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        delete_part_btn = ttk.Button(btn_frame, text="Delete Part", command=self.on_delete_part)
+        delete_part_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        rename_part_btn = ttk.Button(btn_frame, text="Rename Part", command=self.on_rename_part)
+        rename_part_btn.pack(side=tk.LEFT)
+        
+        # Хранилище для структуры частей тела (словарь)
+        self.current_body_structure = {None: []}
         
         # Описание внешности (шаблон)
-        ttk.Label(form_frame, text="Appearance Description Template (use {size}, {gender}, {race}):").grid(row=7, column=0, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Appearance Description Template (use {size}, {gender}, {race}):").grid(row=9, column=0, sticky=tk.W, pady=5)
         self.new_body_desc_template_entry = ttk.Entry(form_frame, width=60)
-        self.new_body_desc_template_entry.grid(row=7, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
-        ttk.Label(form_frame, text="Example: A {size} {gender} {race} with an insectoid body.").grid(row=8, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
+        self.new_body_desc_template_entry.grid(row=9, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+        ttk.Label(form_frame, text="Example: A {size} {gender} {race} with an insectoid body.").grid(row=10, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
 
         # Кнопка создания
         create_btn = ttk.Button(form_frame, text="Create Body Type", command=self.on_create_body_type_clicked)
-        create_btn.grid(row=9, column=0, columnspan=2, pady=15)
+        create_btn.grid(row=11, column=0, columnspan=2, pady=15)
 
         # Список существующих типов тел
         list_frame = ttk.LabelFrame(frame, text="Existing Body Types")
@@ -312,13 +344,188 @@ class MainWindow(tk.Tk):
         for body_name in sorted(self.available_bodies.keys()):
             self.bodies_listbox.insert(tk.END, body_name)
 
+    def update_body_parts_tree(self):
+        """Обновляет дерево частей тела на основе current_body_structure."""
+        # Очищаем дерево
+        for item in self.body_parts_tree.get_children():
+            self.body_parts_tree.delete(item)
+        
+        # Рекурсивно добавляем узлы
+        def add_children(parent_node_id, parent_key):
+            children = self.current_body_structure.get(parent_key, [])
+            for child_name in children:
+                # Добавляем узел в дерево
+                node_id = self.body_parts_tree.insert(parent_node_id, "end", text=child_name, values=(child_name,))
+                # Рекурсивно добавляем детей этого узла
+                add_children(node_id, child_name)
+        
+        # Начинаем с корневых элементов (ключ None)
+        root_parts = self.current_body_structure.get(None, [])
+        for part_name in root_parts:
+            node_id = self.body_parts_tree.insert("", "end", text=part_name, values=(part_name,))
+            add_children(node_id, part_name)
+
+    def on_add_root_part(self):
+        """Добавляет корневую часть тела."""
+        dialog = tk.Toplevel(self)
+        dialog.title("Add Root Part")
+        dialog.geometry("300x100")
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Part Name:").pack(pady=5)
+        entry = ttk.Entry(dialog)
+        entry.pack(pady=5)
+        entry.focus()
+        
+        def confirm():
+            name = entry.get().strip()
+            if not name:
+                messagebox.showwarning("Invalid Input", "Part name cannot be empty.", parent=dialog)
+                return
+            if name in self.current_body_structure:
+                messagebox.showwarning("Duplicate", f"Part '{name}' already exists.", parent=dialog)
+                return
+            
+            # Добавляем в структуру
+            self.current_body_structure[None].append(name)
+            self.current_body_structure[name] = []
+            self.update_body_parts_tree()
+            dialog.destroy()
+        
+        ttk.Button(dialog, text="Add", command=confirm).pack(pady=5)
+
+    def on_add_child_part(self):
+        """Добавляет дочернюю часть к выбранной."""
+        selected = self.body_parts_tree.selection()
+        if not selected:
+            messagebox.showwarning("No Selection", "Please select a parent part first.", parent=self)
+            return
+        
+        parent_name = self.body_parts_tree.item(selected[0])["text"]
+        
+        dialog = tk.Toplevel(self)
+        dialog.title(f"Add Child to '{parent_name}'")
+        dialog.geometry("300x100")
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Child Part Name:").pack(pady=5)
+        entry = ttk.Entry(dialog)
+        entry.pack(pady=5)
+        entry.focus()
+        
+        def confirm():
+            name = entry.get().strip()
+            if not name:
+                messagebox.showwarning("Invalid Input", "Part name cannot be empty.", parent=dialog)
+                return
+            if name in self.current_body_structure:
+                messagebox.showwarning("Duplicate", f"Part '{name}' already exists.", parent=dialog)
+                return
+            
+            # Добавляем в структуру
+            self.current_body_structure[parent_name].append(name)
+            self.current_body_structure[name] = []
+            self.update_body_parts_tree()
+            dialog.destroy()
+        
+        ttk.Button(dialog, text="Add", command=confirm).pack(pady=5)
+
+    def on_delete_part(self):
+        """Удаляет выбранную часть и всех её потомков."""
+        selected = self.body_parts_tree.selection()
+        if not selected:
+            messagebox.showwarning("No Selection", "Please select a part to delete.", parent=self)
+            return
+        
+        part_name = self.body_parts_tree.item(selected[0])["text"]
+        
+        if not messagebox.askyesno("Confirm Delete", f"Delete '{part_name}' and all its children?", parent=self):
+            return
+        
+        # Удаляем из списка родителя
+        for parent, children in list(self.current_body_structure.items()):
+            if part_name in children:
+                children.remove(part_name)
+        
+        # Рекурсивно собираем всех потомков для удаления
+        def get_all_descendants(part):
+            descendants = []
+            children = self.current_body_structure.get(part, [])
+            for child in children:
+                descendants.append(child)
+                descendants.extend(get_all_descendants(child))
+            return descendants
+        
+        all_to_remove = [part_name] + get_all_descendants(part_name)
+        
+        # Удаляем записи о детях
+        for part in all_to_remove:
+            if part in self.current_body_structure:
+                del self.current_body_structure[part]
+        
+        self.update_body_parts_tree()
+
+    def on_rename_part(self):
+        """Переименовывает выбранную часть."""
+        selected = self.body_parts_tree.selection()
+        if not selected:
+            messagebox.showwarning("No Selection", "Please select a part to rename.", parent=self)
+            return
+        
+        old_name = self.body_parts_tree.item(selected[0])["text"]
+        
+        dialog = tk.Toplevel(self)
+        dialog.title(f"Rename '{old_name}'")
+        dialog.geometry("300x100")
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="New Name:").pack(pady=5)
+        entry = ttk.Entry(dialog)
+        entry.insert(0, old_name)
+        entry.pack(pady=5)
+        entry.focus()
+        entry.select_range(0, tk.END)
+        
+        def confirm():
+            new_name = entry.get().strip()
+            if not new_name:
+                messagebox.showwarning("Invalid Input", "Part name cannot be empty.", parent=dialog)
+                return
+            if new_name == old_name:
+                dialog.destroy()
+                return
+            if new_name in self.current_body_structure:
+                messagebox.showwarning("Duplicate", f"Part '{new_name}' already exists.", parent=dialog)
+                return
+            
+            # Обновляем структуру
+            # 1. Находим родителя и обновляем список детей
+            parent_key = None
+            for p, children in self.current_body_structure.items():
+                if old_name in children:
+                    children[children.index(old_name)] = new_name
+                    parent_key = p
+                    break
+            
+            # 2. Обновляем ключ в словаре (если это не None)
+            if old_name in self.current_body_structure:
+                children_list = self.current_body_structure.pop(old_name)
+                self.current_body_structure[new_name] = children_list
+            
+            self.update_body_parts_tree()
+            dialog.destroy()
+        
+        ttk.Button(dialog, text="Rename", command=confirm).pack(pady=5)
+
     def on_create_body_type_clicked(self):
         """Обработчик создания нового типа тела через интерфейс."""
         class_name = self.new_body_class_name_entry.get().strip()
         display_name = self.new_body_display_name_entry.get().strip()
         default_size = self.new_body_size_var.get().strip()
         default_gender = self.new_body_gender_entry.get().strip()
-        body_parts_text = self.new_body_parts_entry.get("1.0", tk.END).strip()
         desc_template = self.new_body_desc_template_entry.get().strip()
 
         # Валидация
@@ -330,9 +537,12 @@ class MainWindow(tk.Tk):
              return
         if not display_name:
             display_name = class_name.replace("Body", "")
-        if not body_parts_text:
-            messagebox.showwarning("Invalid Input", "Body Parts are required.")
+        
+        # Проверяем, есть ли корневые части
+        if not self.current_body_structure[None]:
+            messagebox.showwarning("Invalid Input", "Please add at least one root body part.")
             return
+        
         if not desc_template:
             messagebox.showwarning("Invalid Input", "Appearance Description Template is required.")
             return
@@ -342,50 +552,8 @@ class MainWindow(tk.Tk):
             messagebox.showwarning("Duplicate", f"A body type with class name '{class_name}' already exists.")
             return
 
-        # Парсинг иерархии частей тела
-        # Формат: parent:child или просто part (для корневых)
-        # Разделители: запятая, точка с запятой, новая строка
-        body_structure = {None: []}
-        
-        # Заменяем новые строки на точки с запятой для единообразия
-        parts_lines = body_parts_text.replace('\n', ';').split(';')
-        
-        for line in parts_lines:
-            line = line.strip()
-            if not line:
-                continue
-            
-            if ':' in line:
-                parent, child = line.split(':', 1)
-                parent = parent.strip()
-                child = child.strip()
-                
-                if not parent or not child:
-                    continue
-                
-                # Добавляем родителя в корень если он ещё не добавлен никуда
-                if parent not in body_structure and parent not in [p for children in body_structure.values() for p in children]:
-                    body_structure[None].append(parent)
-                    body_structure[parent] = []
-                elif parent not in body_structure:
-                    body_structure[parent] = []
-                
-                # Добавляем ребенка к родителю
-                if child not in body_structure[parent]:
-                    body_structure[parent].append(child)
-                    if child not in body_structure:
-                        body_structure[child] = []
-            else:
-                # Корневая часть без родителя
-                part = line.strip()
-                if part and part not in body_structure[None]:
-                    body_structure[None].append(part)
-                    if part not in body_structure:
-                        body_structure[part] = []
-
-        if not body_structure[None]:
-            messagebox.showwarning("Invalid Input", "Please provide at least one root body part.")
-            return
+        # Используем текущую структуру напрямую
+        body_structure = dict(self.current_body_structure)
 
         # Генерация кода для нового файла тела
         # Используем простой шаблон, предполагая, что у всех тел есть race, size, gender (опционально)
@@ -439,13 +607,16 @@ class MainWindow(tk.Tk):
             # Обновляем список в интерфейсе
             self.refresh_bodies_list()
             
-            # Очищаем поля формы
+            # Очищаем поля формы и дерево
             self.new_body_class_name_entry.delete(0, tk.END)
             self.new_body_display_name_entry.delete(0, tk.END)
             self.new_body_gender_entry.delete(0, tk.END)
-            self.new_body_parts_entry.delete("1.0", tk.END)
             self.new_body_desc_template_entry.delete(0, tk.END)
             self.new_body_size_var.set("Medium")
+            
+            # Сбрасываем структуру и дерево
+            self.current_body_structure = {None: []}
+            self.update_body_parts_tree()
 
             messagebox.showinfo("Success", f"Successfully created new body type '{class_name}'!\nIt is now available for selection.")
             

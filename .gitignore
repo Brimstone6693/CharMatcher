@@ -1,71 +1,18 @@
-```
-# Python
-__pycache__/
+```gitignore
+# Python compiled files
 *.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.egg-info/
+__pycache__/
 
-# Virtual environments
-venv/
-.venv/
-env/
-ENV/
-
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build artifacts
-build/
-dist/
-*.egg
-*.eggs
-*.whl
-.coverage
-htmlcov/
-
-# Testing
-.pytest_cache/
-.mypy_cache/
-.tox/
-.coverage*
-
-# Logs
+# Logs and temp files
 *.log
+*.tmp
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Editor
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Environment variables
+# Environment files
 .env
 .env.local
-.env.*
-!.env.example
+*.env.*
 
-# Temporary files
-*.tmp
-*.temp
-*.bak
-*.backup
-
-# Coverage reports
-coverage/
+# Editors
+.vscode/
+.idea/
 ```
