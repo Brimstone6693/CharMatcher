@@ -252,9 +252,10 @@ class MainWindow(tk.Tk):
         form_frame.pack(fill=tk.X, pady=10, padx=10)
 
         # Имя класса (например, InsectoidBody)
-        ttk.Label(form_frame, text="Class Name (e.g., InsectoidBody):").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(form_frame, text="Class Name (e.g., Insectoid):").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.new_body_class_name_entry = ttk.Entry(form_frame)
         self.new_body_class_name_entry.grid(row=0, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+        ttk.Label(form_frame, text="('Body' will be added automatically)").grid(row=0, column=2, sticky=tk.W, pady=5, padx=(5, 0))
 
         # Отображаемое имя (например, Insectoid)
         ttk.Label(form_frame, text="Display Name (e.g., Insectoid):").grid(row=1, column=0, sticky=tk.W, pady=5)
@@ -279,9 +280,9 @@ class MainWindow(tk.Tk):
         tree_frame = ttk.Frame(form_frame)
         tree_frame.grid(row=5, column=1, sticky=tk.EW, pady=5, padx=(10, 0), rowspan=3)
         
-        # Дерево для отображения иерархии
+        # Дерево для отображения иерархии с поддержкой множественного выбора
         columns = ("name",)
-        self.body_parts_tree = ttk.Treeview(tree_frame, columns=columns, show="tree", height=8)
+        self.body_parts_tree = ttk.Treeview(tree_frame, columns=columns, show="tree", height=8, selectmode="extended")
         self.body_parts_tree.heading("#0", text="Body Parts")
         self.body_parts_tree.column("#0", width=250)
         
@@ -309,19 +310,22 @@ class MainWindow(tk.Tk):
         
         # Хранилище для структуры частей тела (словарь)
         self.current_body_structure = {None: []}
+        # Хранилище состояния раскрытия дерева
+        self.tree_expanded_items = set()
         
         # Описание внешности (шаблон)
         ttk.Label(form_frame, text="Appearance Description Template (use {size}, {gender}, {race}):").grid(row=9, column=0, sticky=tk.W, pady=5)
         self.new_body_desc_template_entry = ttk.Entry(form_frame, width=60)
         self.new_body_desc_template_entry.grid(row=9, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
         ttk.Label(form_frame, text="Example: A {size} {gender} {race} with an insectoid body.").grid(row=10, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
+        ttk.Label(form_frame, text="(Leave empty for default template)").grid(row=11, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
 
         # Кнопка создания
         create_btn = ttk.Button(form_frame, text="Create Body Type", command=self.on_create_body_type_clicked)
-        create_btn.grid(row=11, column=0, columnspan=2, pady=15)
+        create_btn.grid(row=12, column=0, columnspan=2, pady=15)
 
         # Список существующих типов тел
-        list_frame = ttk.LabelFrame(frame, text="Existing Body Types")
+        list_frame = ttk.LabelFrame(frame, text="Existing Body Types (Right-click for options)")
         list_frame.pack(fill=tk.BOTH, expand=True, pady=10, padx=10)
 
         self.bodies_listbox = tk.Listbox(list_frame)
@@ -331,12 +335,31 @@ class MainWindow(tk.Tk):
         self.bodies_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
+        # Контекстное меню для списка тел
+        self.body_list_menu = tk.Menu(self, tearoff=0)
+        self.body_list_menu.add_command(label="Load into Editor", command=self.on_load_body_to_editor)
+        self.body_list_menu.add_command(label="Rename", command=self.on_rename_body_type)
+        self.body_list_menu.add_command(label="Copy", command=self.on_copy_body_type)
+        self.body_list_menu.add_command(label="Delete", command=self.on_delete_body_type)
+
+        # Привязка контекстного меню к списку
+        self.bodies_listbox.bind("<Button-3>", self.on_body_list_right_click)
+        self.bodies_listbox.bind("<Double-Button-1>", lambda e: self.on_load_body_to_editor())
+
         # Заполняем список
         self.refresh_bodies_list()
+        
+        # Инициализируем дерево с обязательной корневой частью "Body"
+        self.init_body_structure_with_root()
 
         # Кнопка назад
         back_btn = ttk.Button(frame, text="Back to Start", command=self.show_start_screen)
         back_btn.pack(pady=5)
+
+    def init_body_structure_with_root(self):
+        """Инициализирует структуру тела с обязательной корневой частью 'Body'."""
+        self.current_body_structure = {None: ["Body"], "Body": []}
+        self.update_body_parts_tree()
 
     def refresh_bodies_list(self):
         """Обновляет список отображаемых типов тел в ListBox."""
@@ -345,7 +368,10 @@ class MainWindow(tk.Tk):
             self.bodies_listbox.insert(tk.END, body_name)
 
     def update_body_parts_tree(self):
-        """Обновляет дерево частей тела на основе current_body_structure."""
+        """Обновляет дерево частей тела на основе current_body_structure с сохранением состояния раскрытия."""
+        # Сохраняем текущее состояние раскрытия узлов
+        self.tree_expanded_items = set(self.body_parts_tree.item(item, "open") for item in self.body_parts_tree.get_children("") if self.body_parts_tree.item(item, "open"))
+        
         # Очищаем дерево
         for item in self.body_parts_tree.get_children():
             self.body_parts_tree.delete(item)
@@ -363,12 +389,14 @@ class MainWindow(tk.Tk):
         root_parts = self.current_body_structure.get(None, [])
         for part_name in root_parts:
             node_id = self.body_parts_tree.insert("", "end", text=part_name, values=(part_name,))
+            # Раскрываем корневые узлы по умолчанию
+            self.body_parts_tree.item(node_id, open=True)
             add_children(node_id, part_name)
 
     def on_add_root_part(self):
-        """Добавляет корневую часть тела."""
+        """Добавляет дочернюю часть к 'Body' (независимо от выбора пользователя)."""
         dialog = tk.Toplevel(self)
-        dialog.title("Add Root Part")
+        dialog.title("Add Body Part")
         dialog.geometry("300x100")
         dialog.transient(self)
         dialog.grab_set()
@@ -387,8 +415,10 @@ class MainWindow(tk.Tk):
                 messagebox.showwarning("Duplicate", f"Part '{name}' already exists.", parent=dialog)
                 return
             
-            # Добавляем в структуру
-            self.current_body_structure[None].append(name)
+            # Добавляем как дочернюю часть к 'Body'
+            if "Body" not in self.current_body_structure:
+                self.current_body_structure["Body"] = []
+            self.current_body_structure["Body"].append(name)
             self.current_body_structure[name] = []
             self.update_body_parts_tree()
             dialog.destroy()
@@ -396,16 +426,17 @@ class MainWindow(tk.Tk):
         ttk.Button(dialog, text="Add", command=confirm).pack(pady=5)
 
     def on_add_child_part(self):
-        """Добавляет дочернюю часть к выбранной."""
+        """Добавляет дочернюю часть к выбранным узлам (поддержка множественного выбора)."""
         selected = self.body_parts_tree.selection()
         if not selected:
-            messagebox.showwarning("No Selection", "Please select a parent part first.", parent=self)
+            messagebox.showwarning("No Selection", "Please select one or more parent parts first.", parent=self)
             return
         
-        parent_name = self.body_parts_tree.item(selected[0])["text"]
+        # Получаем имена всех выбранных родительских узлов
+        parent_names = [self.body_parts_tree.item(item)["text"] for item in selected]
         
         dialog = tk.Toplevel(self)
-        dialog.title(f"Add Child to '{parent_name}'")
+        dialog.title(f"Add Child to {len(parent_names)} part(s)")
         dialog.geometry("300x100")
         dialog.transient(self)
         dialog.grab_set()
@@ -424,8 +455,12 @@ class MainWindow(tk.Tk):
                 messagebox.showwarning("Duplicate", f"Part '{name}' already exists.", parent=dialog)
                 return
             
-            # Добавляем в структуру
-            self.current_body_structure[parent_name].append(name)
+            # Добавляем как дочернюю часть ко всем выбранным родителям
+            for parent_name in parent_names:
+                if parent_name not in self.current_body_structure:
+                    self.current_body_structure[parent_name] = []
+                self.current_body_structure[parent_name].append(name)
+            
             self.current_body_structure[name] = []
             self.update_body_parts_tree()
             dialog.destroy()
@@ -538,19 +573,17 @@ class MainWindow(tk.Tk):
         if not display_name:
             display_name = class_name.replace("Body", "")
         
+        # Проверка на дубликат
+        if class_name in self.available_bodies:
+            messagebox.showwarning("Duplicate", f"A body type with class name '{class_name}' already exists.")
+            return
+
         # Проверяем, есть ли корневые части
         if not self.current_body_structure[None]:
             messagebox.showwarning("Invalid Input", "Please add at least one root body part.")
             return
         
-        if not desc_template:
-            messagebox.showwarning("Invalid Input", "Appearance Description Template is required.")
-            return
-
-        # Проверка на дубликат
-        if class_name in self.available_bodies:
-            messagebox.showwarning("Duplicate", f"A body type with class name '{class_name}' already exists.")
-            return
+        # Шаблон описания теперь опционален - если пустой, будет использован дефолтный
 
         # Используем текущую структуру напрямую
         body_structure = dict(self.current_body_structure)
@@ -577,6 +610,10 @@ class MainWindow(tk.Tk):
         code_lines.append("")
         
         # Формируем описание
+        # Если шаблон пустой, используем дефолтный
+        if not desc_template:
+            desc_template = f"A {{size}} {{gender}} {display_name}."
+        
         # Заменяем плейсхолдеры в шаблоне на атрибуты объекта
         # Шаблон пользователя: "A {size} {gender} {race} with an insectoid body."
         # В коде будет: return f"A {self.size} {self.gender} {self.race} with an insectoid body."
@@ -622,6 +659,365 @@ class MainWindow(tk.Tk):
             
         except Exception as e:
             messagebox.showerror("Creation Error", f"Failed to create body type file:\n{e}")
+
+    def on_body_list_right_click(self, event):
+        """Обработчик правого клика по списку типов тел."""
+        # Выбираем элемент под курсором
+        index = self.bodies_listbox.nearest(event.y)
+        self.bodies_listbox.selection_clear(0, tk.END)
+        self.bodies_listbox.selection_set(index)
+        self.bodies_listbox.activate(index)
+        
+        # Показываем контекстное меню
+        try:
+            self.body_list_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.body_list_menu.grab_release()
+
+    def on_load_body_to_editor(self):
+        """Загружает выбранный тип тела в редактор для просмотра/редактирования."""
+        selection = self.bodies_listbox.curselection()
+        if not selection:
+            return
+        
+        body_name = self.bodies_listbox.get(selection[0])
+        
+        # Получаем путь к файлу тела
+        filename = f"{body_name.lower()}.py"
+        filepath = os.path.join("bodies", filename)
+        
+        if not os.path.exists(filepath):
+            messagebox.showerror("Error", f"File for '{body_name}' not found at {filepath}.")
+            return
+        
+        try:
+            # Динамически загружаем модуль
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(body_name, filepath)
+            module = importlib.util.module_from_spec(spec)
+            
+            # Проверяем, не является ли класс встроенным
+            # Если файл содержит определение класса, загружаем его
+            with open(filepath, 'r', encoding='utf-8') as f:
+                source_code = f.read()
+            
+            # Выполняем код модуля в безопасном контексте
+            exec(source_code, module.__dict__)
+            
+            # Получаем класс из модуля
+            body_class = getattr(module, body_name, None)
+            
+            if not body_class:
+                messagebox.showerror("Error", f"Could not find class '{body_name}' in the module.")
+                return
+            
+            # Создаем экземпляр для получения данных
+            if hasattr(body_class, '__init__') and 'gender' in body_class.__init__.__code__.co_varnames:
+                instance = body_class(race=body_name.replace("Body", ""), gender="N/A")
+            else:
+                instance = body_class(race=body_name.replace("Body", ""))
+            
+            # Заполняем поля формы
+            self.new_body_class_name_entry.delete(0, tk.END)
+            self.new_body_class_name_entry.insert(0, body_name)
+            
+            display_name = body_name.replace("Body", "")
+            self.new_body_display_name_entry.delete(0, tk.END)
+            self.new_body_display_name_entry.insert(0, display_name)
+            
+            self.new_body_size_var.set(getattr(instance, 'size', 'Medium'))
+            
+            if hasattr(instance, 'gender'):
+                self.new_body_gender_entry.delete(0, tk.END)
+                self.new_body_gender_entry.insert(0, getattr(instance, 'gender', ''))
+            
+            # Загружаем структуру частей тела
+            if hasattr(instance, 'body_structure'):
+                self.current_body_structure = dict(instance.body_structure)
+                self.update_body_parts_tree()
+            
+            # Пытаемся получить шаблон описания из исходного кода
+            import re
+            match = re.search(r'return\s+f["\'](.+?)["\']', source_code, re.DOTALL)
+            if match:
+                desc_template = match.group(1)
+                # Восстанавливаем плейсхолдеры
+                desc_template = desc_template.replace("{self.size}", "{size}").replace("{self.gender}", "{gender}").replace("{self.race}", "{race}")
+                self.new_body_desc_template_entry.delete(0, tk.END)
+                self.new_body_desc_template_entry.insert(0, desc_template)
+            
+            messagebox.showinfo("Loaded", f"Loaded '{body_name}' into editor.\nYou can now modify and save it as a new type.")
+            
+        except Exception as e:
+            messagebox.showerror("Load Error", f"Failed to load body data:\n{e}")
+
+    def on_rename_body_type(self):
+        """Переименовывает выбранный тип тела (создает копию с новым именем и удаляет старый)."""
+        selection = self.bodies_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a body type to rename.")
+            return
+        
+        old_name = self.bodies_listbox.get(selection[0])
+        
+        dialog = tk.Toplevel(self)
+        dialog.title(f"Rename '{old_name}'")
+        dialog.geometry("400x150")
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="New Class Name (e.g., Insectoid):").pack(pady=5)
+        ttk.Label(dialog, text="('Body' will be added automatically)").pack(pady=0)
+        entry = ttk.Entry(dialog, width=50)
+        entry.insert(0, old_name.replace("Body", ""))
+        entry.pack(pady=5)
+        entry.focus()
+        
+        def confirm():
+            base_name = entry.get().strip()
+            if not base_name:
+                messagebox.showwarning("Invalid Input", "Class name cannot be empty.", parent=dialog)
+                return
+            
+            # Автоматически добавляем "Body" если нет
+            new_name = base_name if base_name.endswith("Body") else base_name + "Body"
+            
+            if new_name == old_name:
+                dialog.destroy()
+                return
+            if new_name in self.available_bodies:
+                messagebox.showwarning("Duplicate", f"A body type with class name '{new_name}' already exists.", parent=dialog)
+                return
+            
+            # Загружаем данные старого тела из файла
+            filename = f"{old_name.lower()}.py"
+            filepath = os.path.join("bodies", filename)
+            
+            if not os.path.exists(filepath):
+                messagebox.showerror("Error", f"File for '{old_name}' not found at {filepath}.")
+                return
+            
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    source_code = f.read()
+                
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(old_name, filepath)
+                module = importlib.util.module_from_spec(spec)
+                exec(source_code, module.__dict__)
+                
+                body_class = getattr(module, old_name, None)
+                if not body_class:
+                    messagebox.showerror("Error", f"Could not find class '{old_name}' in the module.")
+                    return
+                
+                if hasattr(body_class, '__init__') and 'gender' in body_class.__init__.__code__.co_varnames:
+                    instance = body_class(race=old_name.replace("Body", ""), gender="N/A")
+                else:
+                    instance = body_class(race=old_name.replace("Body", ""))
+                
+                # Генерируем новый код с новым именем
+                body_structure = dict(instance.body_structure)
+                structure_str = str(body_structure).replace("'", '"')
+                
+                # Получаем шаблон описания из исходного кода
+                import re
+                match = re.search(r'return\\s+f["\'](.+?)["\']', source_code, re.DOTALL)
+                desc_code = match.group(1) if match else f"A {{self.size}} {{self.gender}} {new_name.replace('Body', '')}."
+                
+                has_gender = hasattr(instance, 'gender')
+                default_gender = getattr(instance, 'gender', '')
+                default_size = getattr(instance, 'size', 'Medium')
+                
+                code_lines = [
+                    f"# file: bodies/{new_name.lower()}.py",
+                    "from body import AbstractBody",
+                    "",
+                    f"class {new_name}(AbstractBody):",
+                    "    def __init__(self, race=\"Custom\", size=\"" + default_size + "\"" + (f", gender=\"{default_gender}\"" if has_gender else "") + "):",
+                    "        super().__init__(race, size)",
+                ]
+                
+                if has_gender:
+                    code_lines.append("        self.gender = gender")
+                
+                code_lines.append(f"        self.body_structure = {structure_str}")
+                code_lines.append("")
+                code_lines.append(f"    def describe_appearance(self):")
+                code_lines.append(f"        return f\"{desc_code}\"")
+                code_lines.append("")
+                
+                new_code = "\n".join(code_lines)
+                
+                # Сохраняем новый файл
+                filename = f"{new_name.lower()}.py"
+                filepath = os.path.join("bodies", filename)
+                
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(new_code)
+                
+                # Удаляем старый файл
+                old_filename = f"{old_name.lower()}.py"
+                old_filepath = os.path.join("bodies", old_filename)
+                if os.path.exists(old_filepath):
+                    os.remove(old_filepath)
+                
+                # Перезагружаем список тел
+                self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
+                self.refresh_bodies_list()
+                
+                messagebox.showinfo("Success", f"Successfully renamed '{old_name}' to '{new_name}'.")
+                dialog.destroy()
+                
+            except Exception as e:
+                messagebox.showerror("Rename Error", f"Failed to rename body type:\n{e}")
+        
+        ttk.Button(dialog, text="Rename", command=confirm).pack(pady=10)
+
+    def on_copy_body_type(self):
+        """Копирует выбранный тип тела с новым именем."""
+        selection = self.bodies_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a body type to copy.")
+            return
+        
+        old_name = self.bodies_listbox.get(selection[0])
+        
+        dialog = tk.Toplevel(self)
+        dialog.title(f"Copy '{old_name}'")
+        dialog.geometry("400x150")
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        new_default_name = old_name.replace("Body", "") + " Copy"
+        ttk.Label(dialog, text="New Class Name (e.g., Insectoid):").pack(pady=5)
+        ttk.Label(dialog, text="('Body' will be added automatically)").pack(pady=0)
+        entry = ttk.Entry(dialog, width=50)
+        entry.insert(0, new_default_name)
+        entry.pack(pady=5)
+        entry.focus()
+        
+        def confirm():
+            base_name = entry.get().strip()
+            if not base_name:
+                messagebox.showwarning("Invalid Input", "Class name cannot be empty.", parent=dialog)
+                return
+            
+            # Автоматически добавляем "Body" если нет
+            new_name = base_name if base_name.endswith("Body") else base_name + "Body"
+            
+            if new_name in self.available_bodies:
+                messagebox.showwarning("Duplicate", f"A body type with class name '{new_name}' already exists.", parent=dialog)
+                return
+            
+            # Загружаем данные старого тела из файла
+            filename = f"{old_name.lower()}.py"
+            filepath = os.path.join("bodies", filename)
+            
+            if not os.path.exists(filepath):
+                messagebox.showerror("Error", f"File for '{old_name}' not found at {filepath}.")
+                return
+            
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    source_code = f.read()
+                
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(old_name, filepath)
+                module = importlib.util.module_from_spec(spec)
+                exec(source_code, module.__dict__)
+                
+                body_class = getattr(module, old_name, None)
+                if not body_class:
+                    messagebox.showerror("Error", f"Could not find class '{old_name}' in the module.")
+                    return
+                
+                if hasattr(body_class, '__init__') and 'gender' in body_class.__init__.__code__.co_varnames:
+                    instance = body_class(race=old_name.replace("Body", ""), gender="N/A")
+                else:
+                    instance = body_class(race=old_name.replace("Body", ""))
+                
+                # Генерируем новый код
+                body_structure = dict(instance.body_structure)
+                structure_str = str(body_structure).replace("'", '"')
+                
+                import re
+                match = re.search(r'return\\s+f["\'](.+?)["\']', source_code, re.DOTALL)
+                desc_code = match.group(1) if match else f"A {{self.size}} {{self.gender}} {new_name.replace('Body', '')}."
+                
+                has_gender = hasattr(instance, 'gender')
+                default_gender = getattr(instance, 'gender', '')
+                default_size = getattr(instance, 'size', 'Medium')
+                
+                code_lines = [
+                    f"# file: bodies/{new_name.lower()}.py",
+                    "from body import AbstractBody",
+                    "",
+                    f"class {new_name}(AbstractBody):",
+                    "    def __init__(self, race=\"Custom\", size=\"" + default_size + "\"" + (f", gender=\"{default_gender}\"" if has_gender else "") + "):",
+                    "        super().__init__(race, size)",
+                ]
+                
+                if has_gender:
+                    code_lines.append("        self.gender = gender")
+                
+                code_lines.append(f"        self.body_structure = {structure_str}")
+                code_lines.append("")
+                code_lines.append(f"    def describe_appearance(self):")
+                code_lines.append(f"        return f\"{desc_code}\"")
+                code_lines.append("")
+                
+                new_code = "\n".join(code_lines)
+                
+                # Сохраняем новый файл
+                filename = f"{new_name.lower()}.py"
+                filepath = os.path.join("bodies", filename)
+                
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(new_code)
+                
+                # Перезагружаем список тел
+                self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
+                self.refresh_bodies_list()
+                
+                messagebox.showinfo("Success", f"Successfully copied '{old_name}' to '{new_name}'.")
+                dialog.destroy()
+                
+            except Exception as e:
+                messagebox.showerror("Copy Error", f"Failed to copy body type:\n{e}")
+        
+        ttk.Button(dialog, text="Copy", command=confirm).pack(pady=10)
+
+    def on_delete_body_type(self):
+        """Удаляет выбранный тип тела."""
+        selection = self.bodies_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a body type to delete.")
+            return
+        
+        body_name = self.bodies_listbox.get(selection[0])
+        
+        if not messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete '{body_name}'?\nThis will permanently remove the file."):
+            return
+        
+        try:
+            # Удаляем файл
+            filename = f"{body_name.lower()}.py"
+            filepath = os.path.join("bodies", filename)
+            
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                
+                # Перезагружаем список тел
+                self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
+                self.refresh_bodies_list()
+                
+                messagebox.showinfo("Success", f"Successfully deleted '{body_name}'.")
+            else:
+                messagebox.showerror("Error", f"File for '{body_name}' not found at {filepath}.")
+                
+        except Exception as e:
+            messagebox.showerror("Delete Error", f"Failed to delete body type:\n{e}")
 
 
 if __name__ == "__main__":
