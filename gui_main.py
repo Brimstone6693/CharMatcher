@@ -427,9 +427,9 @@ class MainWindow(tk.Tk):
             add_children(node_id, part_name)
 
     def on_add_root_part(self):
-        """Добавляет дочернюю часть к 'Body' (независимо от выбора пользователя)."""
+        """Добавляет корневую часть тела (к ключу None)."""
         dialog = tk.Toplevel(self)
-        dialog.title("Add Body Part")
+        dialog.title("Add Root Body Part")
         dialog.geometry("350x180")
         dialog.transient(self)
         dialog.grab_set()
@@ -453,17 +453,17 @@ class MainWindow(tk.Tk):
             tags_input = tags_entry.get().strip()
             tags = [t.strip() for t in tags_input.split(",") if t.strip()] if tags_input else []
             
-            # Добавляем как дочернюю часть к 'Body'
-            if "Body" not in self.current_body_structure:
-                self.current_body_structure["Body"] = []
+            # Добавляем как корневую часть (ключ None)
+            if None not in self.current_body_structure:
+                self.current_body_structure[None] = []
             
             # Проверяем дубликаты
-            existing_names = [c["name"] if isinstance(c, dict) else c for c in self.current_body_structure["Body"]]
+            existing_names = [c["name"] if isinstance(c, dict) else c for c in self.current_body_structure[None]]
             if name in existing_names:
                 messagebox.showwarning("Duplicate", f"Part '{name}' already exists.", parent=dialog)
                 return
             
-            self.current_body_structure["Body"].append({"name": name, "tags": tags})
+            self.current_body_structure[None].append({"name": name, "tags": tags})
             self.current_body_structure[name] = []
             self.update_body_parts_tree()
             dialog.destroy()
@@ -787,6 +787,22 @@ class MainWindow(tk.Tk):
             # Конвертируем ключ "None" из строки обратно в None
             if "None" in body_structure:
                 body_structure[None] = body_structure.pop("None")
+            
+            # Также нужно нормализовать все части в списках до словарей {name, tags}
+            for key in body_structure:
+                normalized_list = []
+                for item in body_structure[key]:
+                    if isinstance(item, str):
+                        normalized_list.append({"name": item, "tags": []})
+                    elif isinstance(item, dict) and "name" in item:
+                        # Убеждаемся что tags есть
+                        if "tags" not in item:
+                            item["tags"] = []
+                        normalized_list.append(item)
+                    else:
+                        normalized_list.append(item)
+                body_structure[key] = normalized_list
+            
             self.current_body_structure = body_structure
             self.update_body_parts_tree()
             

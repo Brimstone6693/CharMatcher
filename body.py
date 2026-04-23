@@ -136,17 +136,40 @@ class AbstractBody(ABC):
     def from_dict(cls, data, available_body_classes):
         # available_body_classes: {'HumanoidBody': HumanoidBody, 'GhostBody': GhostBody, ...}
         # Восстановление конкретного типа тела из словаря доступных классов
-        class_name = data.pop("__class__")
+        # Используем class_name вместо __class__ для JSON совместимости
+        class_name = data.pop("class_name", None) or data.pop("__class__", None)
+        if not class_name:
+            raise ValueError("Body data must contain 'class_name' or '__class__' field")
+        
         body_class = available_body_classes.get(class_name)
         if body_class:
             instance = body_class(**{k: v for k, v in data.items() if k != "body_structure"})
             # Восстанавливаем структуру частей тела
             if "body_structure" in data:
-                instance.body_structure = data["body_structure"]
+                raw_structure = data["body_structure"]
+                # Конвертируем ключ "null" или "None" из строки обратно в None
+                for null_key in ["null", "None"]:
+                    if null_key in raw_structure:
+                        raw_structure[None] = raw_structure.pop(null_key)
+                        break
+                
+                # Нормализуем все части в списках до словарей {name, tags}
+                normalized_structure = {}
+                for key, parts_list in raw_structure.items():
+                    normalized_list = []
+                    for item in parts_list:
+                        if isinstance(item, str):
+                            normalized_list.append({"name": item, "tags": []})
+                        elif isinstance(item, dict) and "name" in item:
+                            normalized_item = {"name": item["name"], "tags": list(item.get("tags", []))}
+                            normalized_list.append(normalized_item)
+                        else:
+                            normalized_list.append(item)
+                    normalized_structure[key] = normalized_list
+                
+                instance.body_structure = normalized_structure
             return instance
         else:
-            # Если тело не найдено, можно попробовать загрузить базовое тело или вызвать ошибку
-            # Пока бросим ошибку, как в предыдущей версии
             raise ValueError(f"Unknown Body type: {class_name}")
 
 
@@ -179,7 +202,29 @@ class DynamicBody(AbstractBody):
             description_template=data.get("description_template")
         )
         if "body_structure" in data:
-            instance.body_structure = data["body_structure"]
+            raw_structure = data["body_structure"]
+            # Конвертируем ключ "null" или "None" из строки обратно в None
+            for null_key in ["null", "None"]:
+                if null_key in raw_structure:
+                    raw_structure[None] = raw_structure.pop(null_key)
+                    break
+            
+            # Нормализуем все части в списках до словарей {name, tags}
+            normalized_structure = {}
+            for key, parts_list in raw_structure.items():
+                normalized_list = []
+                for item in parts_list:
+                    if isinstance(item, str):
+                        normalized_list.append({"name": item, "tags": []})
+                    elif isinstance(item, dict) and "name" in item:
+                        # Убеждаемся что tags есть
+                        normalized_item = {"name": item["name"], "tags": list(item.get("tags", []))}
+                        normalized_list.append(normalized_item)
+                    else:
+                        normalized_list.append(item)
+                normalized_structure[key] = normalized_list
+            
+            instance.body_structure = normalized_structure
         return instance
     
     def to_dict(self):
@@ -191,9 +236,17 @@ class DynamicBody(AbstractBody):
             "description_template": self.description_template,
             "class_name": self.__class__.__name__
         })
+        # Конвертируем ключ None в строку "null" для JSON совместимости
+        if None in base_dict.get("body_structure", {}):
+            base_dict["body_structure"]["null"] = base_dict["body_structure"].pop(None)
         # Удаляем __class__ так как мы используем class_name для JSON
         base_dict.pop("__class__", None)
         return base_dict
+
+
+# Добавляем DynamicBody в доступные классы тел для загрузки
+# Это нужно чтобы Character.from_dict мог загрузить DynamicBody из сохранений
+AbstractBody._dynamic_body_class = DynamicBody
 
 
 # --- Пример конкретных тел ---

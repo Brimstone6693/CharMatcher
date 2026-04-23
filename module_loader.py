@@ -37,6 +37,10 @@ def load_available_modules_and_bodies(components_dir="modules", bodies_dir="bodi
                 except Exception as e:
                     print(f"  Error loading component module {filename}: {e}")
 
+    # Добавляем DynamicBody как доступный класс для загрузки сохранений
+    # Это нужно чтобы Character.from_dict мог восстановить DynamicBody из JSON
+    available_bodies["DynamicBody"] = DynamicBody  # Сам класс, а не экземпляр
+
     # Загрузка тел из JSON файлов
     if os.path.exists(BODIES_DATA_DIR):
         for filename in os.listdir(BODIES_DATA_DIR):
