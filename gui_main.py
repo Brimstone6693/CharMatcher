@@ -773,7 +773,6 @@ class MainWindow(tk.Tk):
             return
         
         body_name = self.bodies_listbox.get(selection[0])
-        
         # Получаем путь к файлу тела
         filename = f"{body_name.lower()}.py"
         filepath = os.path.join("bodies", filename)
@@ -804,6 +803,7 @@ class MainWindow(tk.Tk):
                 return
             
             # Создаем экземпляр для получения данных
+
             if hasattr(body_class, '__init__') and 'gender' in body_class.__init__.__code__.co_varnames:
                 instance = body_class(race=body_name.replace("Body", ""), gender="N/A")
             else:
@@ -829,8 +829,10 @@ class MainWindow(tk.Tk):
                 self.update_body_parts_tree()
             
             # Пытаемся получить шаблон описания из исходного кода
+
             import re
             match = re.search(r'return\s+f["\'](.+?)["\']', source_code, re.DOTALL)
+
             if match:
                 desc_template = match.group(1)
                 # Восстанавливаем плейсхолдеры
@@ -857,11 +859,12 @@ class MainWindow(tk.Tk):
         dialog.geometry("400x150")
         dialog.transient(self)
         dialog.grab_set()
-        
+
         ttk.Label(dialog, text="New Class Name (e.g., Insectoid):").pack(pady=5)
         ttk.Label(dialog, text="('Body' will be added automatically)").pack(pady=0)
         entry = ttk.Entry(dialog, width=50)
         entry.insert(0, old_name.replace("Body", ""))
+
         entry.pack(pady=5)
         entry.focus()
         
@@ -873,14 +876,14 @@ class MainWindow(tk.Tk):
             
             # Автоматически добавляем "Body" если нет
             new_name = base_name if base_name.endswith("Body") else base_name + "Body"
-            
+
             if new_name == old_name:
                 dialog.destroy()
                 return
             if new_name in self.available_bodies:
                 messagebox.showwarning("Duplicate", f"A body type with class name '{new_name}' already exists.", parent=dialog)
                 return
-            
+
             # Загружаем данные старого тела из файла
             filename = f"{old_name.lower()}.py"
             filepath = os.path.join("bodies", filename)
@@ -902,7 +905,7 @@ class MainWindow(tk.Tk):
                 if not body_class:
                     messagebox.showerror("Error", f"Could not find class '{old_name}' in the module.")
                     return
-                
+
                 if hasattr(body_class, '__init__') and 'gender' in body_class.__init__.__code__.co_varnames:
                     instance = body_class(race=old_name.replace("Body", ""), gender="N/A")
                 else:
@@ -911,10 +914,11 @@ class MainWindow(tk.Tk):
                 # Генерируем новый код с новым именем
                 body_structure = dict(instance.body_structure)
                 structure_str = str(body_structure).replace("'", '"')
-                
+
                 # Получаем шаблон описания из исходного кода
                 import re
                 match = re.search(r'return\\s+f["\'](.+?)["\']', source_code, re.DOTALL)
+
                 desc_code = match.group(1) if match else f"A {{self.size}} {{self.gender}} {new_name.replace('Body', '')}."
                 
                 has_gender = hasattr(instance, 'gender')
@@ -981,15 +985,18 @@ class MainWindow(tk.Tk):
         dialog.transient(self)
         dialog.grab_set()
         
+
         new_default_name = old_name.replace("Body", "") + " Copy"
         ttk.Label(dialog, text="New Class Name (e.g., Insectoid):").pack(pady=5)
         ttk.Label(dialog, text="('Body' will be added automatically)").pack(pady=0)
+
         entry = ttk.Entry(dialog, width=50)
         entry.insert(0, new_default_name)
         entry.pack(pady=5)
         entry.focus()
         
         def confirm():
+
             base_name = entry.get().strip()
             if not base_name:
                 messagebox.showwarning("Invalid Input", "Class name cannot be empty.", parent=dialog)
@@ -997,11 +1004,12 @@ class MainWindow(tk.Tk):
             
             # Автоматически добавляем "Body" если нет
             new_name = base_name if base_name.endswith("Body") else base_name + "Body"
-            
+
             if new_name in self.available_bodies:
                 messagebox.showwarning("Duplicate", f"A body type with class name '{new_name}' already exists.", parent=dialog)
                 return
             
+
             # Загружаем данные старого тела из файла
             filename = f"{old_name.lower()}.py"
             filepath = os.path.join("bodies", filename)
@@ -1023,7 +1031,7 @@ class MainWindow(tk.Tk):
                 if not body_class:
                     messagebox.showerror("Error", f"Could not find class '{old_name}' in the module.")
                     return
-                
+
                 if hasattr(body_class, '__init__') and 'gender' in body_class.__init__.__code__.co_varnames:
                     instance = body_class(race=old_name.replace("Body", ""), gender="N/A")
                 else:
@@ -1033,8 +1041,10 @@ class MainWindow(tk.Tk):
                 body_structure = dict(instance.body_structure)
                 structure_str = str(body_structure).replace("'", '"')
                 
+
                 import re
                 match = re.search(r'return\\s+f["\'](.+?)["\']', source_code, re.DOTALL)
+
                 desc_code = match.group(1) if match else f"A {{self.size}} {{self.gender}} {new_name.replace('Body', '')}."
                 
                 has_gender = hasattr(instance, 'gender')
