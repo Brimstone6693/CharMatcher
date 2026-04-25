@@ -158,20 +158,13 @@ class BodyTypeManager:
         # --- Основная рабочая область ---
         workspace = ttk.Frame(main_frame)
         workspace.grid(row=1, column=0, sticky="nsew")
-        workspace.grid_columnconfigure(0, weight=0)  # Левая панель (список/теги) фиксирована
-        workspace.grid_columnconfigure(1, weight=1)  # Дерево растягивается
-        workspace.grid_columnconfigure(2, weight=0)  # Панель свойств фиксирована
-        workspace.grid_rowconfigure(0, weight=1)
+        workspace.grid_columnconfigure(0, weight=1)  # Центральная колонка растягивается
+        workspace.grid_rowconfigure(0, weight=1)     # Верхняя строка (дерево) растягивается
+        workspace.grid_rowconfigure(1, weight=0)     # Нижняя строка (левая панель) фиксирована
         
-        # Левая панель для дополнительных инструментов (список частей или теги)
-        self.left_panel_container = ttk.Frame(workspace)
-        self.left_panel_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
-        self.left_panel_container.grid_rowconfigure(0, weight=1)
-        self.left_panel_container.grid_columnconfigure(0, weight=1)
-        
-        # Центральная часть: Дерево частей тела
+        # Центральная часть: Дерево частей тела (занимает всю ширину по умолчанию)
         tree_container = ttk.LabelFrame(workspace, text="Body Parts Structure", padding=5)
-        tree_container.grid(row=0, column=1, sticky="nsew", padx=(0, 5))
+        tree_container.grid(row=0, column=0, sticky="nsew", columnspan=2)
         tree_container.grid_columnconfigure(0, weight=1)
         tree_container.grid_rowconfigure(0, weight=1)
         
@@ -213,11 +206,10 @@ class BodyTypeManager:
         # Привязка горячих клавиш
         self._bind_shortcuts()
         
-        # Правая панель: Свойства и список тел
+        # Правая панель: Свойства и список тел (теперь в нижней строке)
         right_panel = ttk.Frame(workspace)
-        right_panel.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
-        right_panel.grid_rowconfigure(0, weight=0)  # Форма свойств не растягивается
-        right_panel.grid_rowconfigure(1, weight=1)  # Список тел растягивается
+        right_panel.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
+        right_panel.grid_rowconfigure(0, weight=1)  # Список тел растягивается
         right_panel.grid_columnconfigure(0, weight=1)
         
         # Форма свойств тела
@@ -286,7 +278,7 @@ class BodyTypeManager:
         
         # Список сохраненных тел
         list_frame = ttk.LabelFrame(right_panel, text="Saved Body Types", padding=5)
-        list_frame.grid(row=1, column=0, sticky="nsew")
+        list_frame.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
         list_frame.grid_columnconfigure(0, weight=1)
         list_frame.grid_rowconfigure(0, weight=1)
         
@@ -305,6 +297,13 @@ class BodyTypeManager:
         list_btn_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(5, 0))
         ttk.Button(list_btn_frame, text="Load", command=self.on_load_body_to_editor).pack(side=tk.LEFT, padx=2)
         ttk.Button(list_btn_frame, text="Delete", command=self.on_delete_body_type).pack(side=tk.LEFT, padx=2)
+        
+        # Контейнер для левой панели (список частей/теги) - скрыт по умолчанию
+        self.left_panel_container = ttk.Frame(workspace)
+        self.left_panel_container.grid(row=1, column=0, sticky="nsew", padx=(0, 5))
+        self.left_panel_container.grid_remove()  # Скрываем по умолчанию
+        self.left_panel_container.grid_rowconfigure(0, weight=1)
+        self.left_panel_container.grid_columnconfigure(0, weight=1)
         
         # Привязка горячих клавиш
         self._bind_shortcuts()
@@ -346,6 +345,9 @@ class BodyTypeManager:
     
     def show_parts_list(self):
         """Создает и показывает панель списка частей тела."""
+        # Показываем левый контейнер если скрыт
+        self.left_panel_container.grid()
+        
         if self.parts_list_frame is not None:
             # Если фрейм уже создан, просто показываем его
             self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
@@ -395,11 +397,18 @@ class BodyTypeManager:
         if self.parts_list_frame is not None:
             self.parts_list_frame.grid_remove()
         
+        # Скрываем левый контейнер если теги тоже скрыты
+        if not self.tags_manager_visible:
+            self.left_panel_container.grid_remove()
+        
         self.parts_list_visible = False
         self.toggle_parts_list_btn.config(text="📋 List")
     
     def show_tags_manager(self):
         """Создает и показывает панель менеджера тегов."""
+        # Показываем левый контейнер если скрыт
+        self.left_panel_container.grid()
+        
         if self.tags_manager_frame is not None:
             # Если фрейм уже создан, просто показываем его
             self.tags_manager_frame.grid(row=0, column=0, sticky="nsew")
@@ -458,6 +467,10 @@ class BodyTypeManager:
         """Скрывает панель менеджера тегов."""
         if self.tags_manager_frame is not None:
             self.tags_manager_frame.grid_remove()
+        
+        # Скрываем левый контейнер если список частей тоже скрыт
+        if not self.parts_list_visible:
+            self.left_panel_container.grid_remove()
         
         self.tags_manager_visible = False
         self.toggle_tags_manager_btn.config(text="🏷️ Tags")
@@ -2187,6 +2200,10 @@ class BodyTypeManager:
             
             self.current_body_structure = body_structure
             self.update_body_parts_tree()
+            
+            # Обновляем список частей если он открыт
+            if self.parts_list_visible:
+                self.update_parts_list_tree()
             
             # Очищаем историю действий при загрузке нового тела
             self.action_history.clear()
