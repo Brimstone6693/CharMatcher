@@ -183,7 +183,8 @@ class BodyTypeManager:
         self.tree_menu.add_command(label="Redo", command=self.on_redo)
         
         self.body_parts_tree.bind("<Button-3>", self.on_tree_right_click)
-        self.body_parts_tree.bind("<Double-1>", lambda e: self.on_rename_part())
+        # Двойной клик по названию части (колонка #0) - переименование
+        self.body_parts_tree.bind("<Double-1>", self.on_tree_double_click)
         
         # Привязка горячих клавиш
         self._bind_shortcuts()
@@ -295,7 +296,7 @@ class BodyTypeManager:
         self.init_body_structure_with_root()
         
         # Кнопка назад
-        back_btn = ttk.Button(frame, text="Back to Start", command=self.show_start_screen)
+        back_btn = ttk.Button(main_frame, text="Back to Start", command=self.show_start_screen)
         back_btn.pack(pady=5)
         
         return main_frame
@@ -574,20 +575,79 @@ class BodyTypeManager:
         
         self.update_body_parts_tree()
     
-    def on_rename_part(self):
+    def on_rename_part(self, item=None):
         """Переименовывает выбранную часть тела."""
-        selection = self.body_parts_tree.selection()
-        if not selection:
-            messagebox.showwarning("No Selection", "Please select a part to rename.", parent=self.parent)
-            return
+        if item is None:
+            selection = self.body_parts_tree.selection()
+            if not selection:
+                messagebox.showwarning("No Selection", "Please select a part to rename.", parent=self.parent)
+                return
+            item = selection[0]
         
-        old_name = self.body_parts_tree.item(selection[0])["text"].split(" [")[0]
+        old_name = self.body_parts_tree.item(item)["text"].split(" [")[0]
         
         # Нельзя переименовать корневой элемент "Body"
         if old_name == "Body":
             messagebox.showwarning("Cannot Rename", "Cannot rename the root 'Body' part.", parent=self.parent)
             return
         
+        # Создаем Entry прямо в дереве для inline редактирования
+        name_entry = ttk.Entry(self.body_parts_tree)
+        name_entry.insert(0, old_name)
+        
+        # Размещаем Entry в позиции ячейки названия
+        bbox = self.body_parts_tree.bbox(item, "#0")
+        if bbox:
+            x, y, width, height = bbox
+            name_entry.place(x=x, y=y, width=width, height=height)
+            name_entry.focus()
+            name_entry.select_range(0, tk.END)
+            
+            def confirm(event=None):
+                new_name = name_entry.get().strip()
+                if not new_name:
+                    messagebox.showwarning("Invalid Input", "Name cannot be empty.", parent=self.parent)
+                    name_entry.focus()
+                    return
+                
+                if new_name == old_name:
+                    name_entry.destroy()
+                    return
+                
+                # Проверяем на дубликат
+                for parent, children in self.current_body_structure.items():
+                    for child in children:
+                        child_name = child["name"] if isinstance(child, dict) else child
+                        if child_name == new_name:
+                            messagebox.showwarning("Duplicate", f"A part with name '{new_name}' already exists.", parent=self.parent)
+                            name_entry.focus()
+                            return
+                
+                # Переименовываем во всех местах
+                # 1. В списках детей у родителей
+                for parent, children in self.current_body_structure.items():
+                    for i, child in enumerate(children):
+                        if isinstance(child, dict) and child.get("name") == old_name:
+                            children[i]["name"] = new_name
+                        elif child == old_name:
+                            children[i] = new_name
+                
+                # 2. Ключ структуры (если есть)
+                if old_name in self.current_body_structure:
+                    self.current_body_structure[new_name] = self.current_body_structure.pop(old_name)
+                
+                # Сохраняем состояние для Undo
+                self._save_action_state("rename", {"old_name": old_name, "new_name": new_name})
+                
+                self.update_body_parts_tree()
+                name_entry.destroy()
+            
+            name_entry.bind("<Return>", confirm)
+            name_entry.bind("<FocusOut>", confirm)
+            name_entry.bind("<Escape>", lambda e: name_entry.destroy())
+            return
+        
+        # Fallback: если bbox не получен, используем старый диалог
         dialog = tk.Toplevel(self.parent)
         dialog.title(f"Rename '{old_name}'")
         dialog.geometry("350x150")
@@ -644,6 +704,78 @@ class BodyTypeManager:
         
         ttk.Button(dialog, text="Rename", command=confirm).pack(pady=10)
     
+    def on_tree_double_click(self, event):
+        """Обработчик двойного клика по дереву - определяет колонку и вызывает соответствующее редактирование."""
+        # Определяем элемент и колонку
+        item = self.body_parts_tree.identify_row(event.y)
+        column = self.body_parts_tree.identify_column(event.x)
+        
+        if not item:
+            return
+        
+        # Выбираем элемент
+        self.body_parts_tree.selection_set(item)
+        
+        if column == "#0":
+            # Двойной клик по названию части - inline редактирование
+            self.on_rename_part(item=item)
+        elif column == "#1":
+            # Двойной клик по колонке тегов - inline редактирование
+            self.on_edit_tags_inline()
+    
+    def on_edit_tags_inline(self):
+        """Редактирование тегов прямо в дереве (inline)."""
+        selection = self.body_parts_tree.selection()
+        if not selection:
+            return
+        
+        item = selection[0]
+        current_tags_str = self.body_parts_tree.item(item)["values"][0] if self.body_parts_tree.item(item)["values"] else ""
+        current_tags = [t.strip() for t in current_tags_str.strip("[]").split(",") if t.strip()] if current_tags_str else []
+        
+        # Создаем Entry прямо в дереве для inline редактирования
+        tags_entry = ttk.Entry(self.body_parts_tree)
+        tags_entry.insert(0, ", ".join(current_tags))
+        
+        # Размещаем Entry в позиции ячейки тегов
+        bbox = self.body_parts_tree.bbox(item, "tags")
+        if bbox:
+            x, y, width, height = bbox
+            tags_entry.place(x=x, y=y, width=width, height=height)
+            tags_entry.focus()
+            tags_entry.select_range(0, tk.END)
+            
+            def save_tags(event=None):
+                new_tags_str = tags_entry.get().strip()
+                new_tags = [t.strip() for t in new_tags_str.split(",") if t.strip()] if new_tags_str else []
+                
+                # Обновляем структуру
+                part_name = self.body_parts_tree.item(item)["text"].split(" [")[0]
+                self._update_part_tags(part_name, new_tags)
+                
+                # Обновляем дерево
+                self.update_body_parts_tree()
+                tags_entry.destroy()
+            
+            tags_entry.bind("<Return>", save_tags)
+            tags_entry.bind("<FocusOut>", save_tags)
+            tags_entry.bind("<Escape>", lambda e: tags_entry.destroy())
+    
+    def _update_part_tags(self, part_name, new_tags):
+        """Обновляет теги указанной части в структуре."""
+        for parent_key, children in self.current_body_structure.items():
+            if parent_key is None:
+                continue
+            for i, child in enumerate(children):
+                child_name = child["name"] if isinstance(child, dict) else child
+                if child_name == part_name:
+                    if isinstance(child, dict):
+                        child["tags"] = new_tags
+                    else:
+                        # Заменяем строку на dict с тегами
+                        children[i] = {"name": child_name, "tags": new_tags}
+                    return
+    
     def on_copy_parts(self):
         """Копирует выбранные части тела в буфер обмена."""
         selection = self.body_parts_tree.selection()
@@ -651,7 +783,7 @@ class BodyTypeManager:
             messagebox.showwarning("No Selection", "Please select part(s) to copy.", parent=self.parent)
             return
         
-        # Копируем выбранные части и их дочерние элементы
+        # Копируем выбранные части и их дочерние элементы с использованием deepcopy
         self.clipboard_parts = []
         for item in selection:
             part_name = self.body_parts_tree.item(item)["text"].split(" [")[0]
@@ -662,22 +794,35 @@ class BodyTypeManager:
                 if tags_str:
                     part_tags = [t.strip() for t in tags_str.split(",")]
             
-            # Копируем структуру части с детьми
-            part_data = {"name": part_name, "tags": part_tags, "children": []}
-            self._copy_subtree(part_name, part_data["children"])
+            # Собираем полную структуру части с детьми из current_body_structure
+            part_data = self._extract_part_structure(part_name)
             self.clipboard_parts.append(part_data)
         
         messagebox.showinfo("Copy", f"Copied {len(self.clipboard_parts)} part(s) to clipboard.", parent=self.parent)
     
-    def _copy_subtree(self, part_name, children_list):
-        """Рекурсивно копирует поддерево части."""
+    def _extract_part_structure(self, part_name):
+        """Извлекает полную структуру части с детьми и тегами используя deepcopy."""
+        # Находим часть в структуре
+        part_data = {"name": part_name, "tags": [], "children": []}
+        
+        # Ищем часть в родителях чтобы получить теги
+        for parent_key, children in self.current_body_structure.items():
+            if parent_key is None:
+                continue
+            for child in children:
+                child_name = child["name"] if isinstance(child, dict) else child
+                if child_name == part_name:
+                    part_data["tags"] = child.get("tags", []) if isinstance(child, dict) else []
+                    break
+        
+        # Рекурсивно копируем детей с использованием deepcopy для предотвращения проблем с ссылками
         children = self.current_body_structure.get(part_name, [])
         for child in children:
             child_name = child["name"] if isinstance(child, dict) else child
-            child_tags = child.get("tags", []) if isinstance(child, dict) else []
-            child_data = {"name": child_name, "tags": child_tags, "children": []}
-            children_list.append(child_data)
-            self._copy_subtree(child_name, child_data["children"])
+            child_subtree = self._extract_part_structure(child_name)
+            part_data["children"].append(child_subtree)
+        
+        return part_data
     
     def on_paste_parts(self):
         """Вставляет части из буфера обмена к выбранному родителю или как корневые."""
@@ -704,7 +849,7 @@ class BodyTypeManager:
             self.current_body_structure[parent_name] = []
         
         def add_part_with_children(part_data, parent_key):
-            """Рекурсивно добавляет часть и её детей."""
+            """Рекурсивно добавляет часть и её детей с уникальными именами."""
             name = part_data["name"]
             tags = part_data.get("tags", [])
             
@@ -717,17 +862,19 @@ class BodyTypeManager:
             # Если имя уже существует, добавляем суффикс
             base_name = name
             counter = 1
-            while name in existing_names:
-                name = f"{base_name}_{counter}"
+            new_name = name
+            while new_name in existing_names:
+                new_name = f"{base_name}_{counter}"
                 counter += 1
             
-            self.current_body_structure[parent_key].append({"name": name, "tags": tags})
-            if name not in self.current_body_structure:
-                self.current_body_structure[name] = []
+            # Добавляем часть с новым (уникальным) именем
+            self.current_body_structure[parent_key].append({"name": new_name, "tags": tags})
+            if new_name not in self.current_body_structure:
+                self.current_body_structure[new_name] = []
             
-            # Добавляем детей
+            # Добавляем детей с рекурсией, передавая новое имя родителя
             for child_data in part_data.get("children", []):
-                add_part_with_children(child_data, name)
+                add_part_with_children(child_data, new_name)
         
         for part_data in parts_to_paste:
             add_part_with_children(part_data, parent_name)
