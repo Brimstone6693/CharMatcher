@@ -188,12 +188,13 @@ class BodyTypeManager:
         # Правая панель: Свойства и список тел
         right_panel = ttk.Frame(workspace)
         right_panel.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
-        right_panel.grid_rowconfigure(1, weight=1)
+        right_panel.grid_rowconfigure(0, weight=0)  # Форма свойств не растягивается
+        right_panel.grid_rowconfigure(1, weight=1)  # Список тел растягивается
         right_panel.grid_columnconfigure(0, weight=1)
         
         # Форма свойств тела
         props_frame = ttk.LabelFrame(right_panel, text="Body Type Properties", padding=10)
-        props_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        props_frame.grid(row=0, column=0, sticky="ew", pady=(0, 5))
         props_frame.grid_columnconfigure(1, weight=1)
         
         # Имя класса
@@ -262,7 +263,7 @@ class BodyTypeManager:
         list_scroll.grid(row=0, column=1, sticky="ns")
         self.bodies_listbox.config(yscrollcommand=list_scroll.set)
         
-        self.bodies_listbox.bind("<<ListboxSelect>>", self.on_body_selected)
+        self.bodies_listbox.bind("<<ListboxSelect>>", lambda e: None)  # Убрано, т.к. используется только двойной клик
         self.bodies_listbox.bind("<Double-Button-1>", lambda e: self.on_load_body_to_editor())
         
         # Кнопки списка
@@ -279,59 +280,6 @@ class BodyTypeManager:
         
         # Инициализация авто-размера
         self.update_auto_size()
-        delete_part_btn.pack(side=tk.LEFT, padx=(0, 5))
-        
-        rename_part_btn = ttk.Button(btn_frame, text="Rename Part", command=self.on_rename_part)
-        rename_part_btn.pack(side=tk.LEFT, padx=(0, 5))
-        
-        copy_part_btn = ttk.Button(btn_frame, text="Copy", command=self.on_copy_parts)
-        copy_part_btn.pack(side=tk.LEFT, padx=(0, 5))
-        
-        paste_part_btn = ttk.Button(btn_frame, text="Paste", command=self.on_paste_parts)
-        paste_part_btn.pack(side=tk.LEFT)
-        
-        # Хранилище для структуры частей тела (словарь)
-        self.current_body_structure = {None: []}
-        # Хранилище состояния раскрытия дерева
-        self.tree_expanded_items = set()
-        
-        # Описание внешности (шаблон)
-        ttk.Label(form_frame, text="Appearance Description Template (use {size}, {gender}, {race}):").grid(row=9, column=0, sticky=tk.W, pady=5)
-        self.new_body_desc_template_entry = ttk.Entry(form_frame, width=60)
-        self.new_body_desc_template_entry.grid(row=9, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
-        ttk.Label(form_frame, text="Example: A {size} {gender} {race} with an insectoid body.").grid(row=10, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
-        ttk.Label(form_frame, text="(Leave empty for default template)").grid(row=11, column=1, sticky=tk.W, pady=(0, 5), padx=(10, 0))
-        
-        # Кнопка создания
-        create_btn = ttk.Button(form_frame, text="Create Body Type", command=self.on_create_body_type_clicked)
-        create_btn.grid(row=12, column=0, columnspan=2, pady=15)
-        
-        # Список существующих типов тел
-        list_frame = ttk.LabelFrame(frame, text="Existing Body Types (Right-click for options)")
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=10, padx=10)
-        
-        self.bodies_listbox = tk.Listbox(list_frame)
-        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.bodies_listbox.yview)
-        self.bodies_listbox.configure(yscrollcommand=scrollbar.set)
-        
-        self.bodies_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # Контекстное меню для списка тел
-        self.body_list_menu = tk.Menu(self.parent, tearoff=0)
-        self.body_list_menu.add_command(label="Load into Editor", command=self.on_load_body_to_editor)
-        self.body_list_menu.add_command(label="Rename", command=self.on_rename_body_type)
-        self.body_list_menu.add_command(label="Copy", command=self.on_copy_body_type)
-        self.body_list_menu.add_command(label="Delete", command=self.on_delete_body_type)
-        
-        # Привязка контекстного меню к списку и горячих клавиш
-        self.bodies_listbox.bind("<Button-3>", self.on_body_list_right_click)
-        self.bodies_listbox.bind("<Double-Button-1>", lambda e: self.on_load_body_to_editor())
-        self.bodies_listbox.bind("<Control-c>", lambda e: self.on_copy_body_type())
-        self.bodies_listbox.bind("<Control-v>", lambda e: messagebox.showinfo("Info", "Paste is not available for body types list.", parent=self.parent))
-        self.bodies_listbox.bind("<Delete>", lambda e: self.on_delete_body_type())
-        
-        # Заполняем список
         self.refresh_bodies_list()
         
         # Инициализируем дерево с обязательной корневой частью "Body"
