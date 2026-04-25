@@ -251,7 +251,7 @@ class MainWindow(tk.Tk):
         form_frame = ttk.LabelFrame(frame, text="Add New Body Type")
         form_frame.pack(fill=tk.X, pady=10, padx=10)
 
-        # Имя класса (например, InsectoidBody)
+        # Имя класса (например, Insectoid)
         ttk.Label(form_frame, text="Class Name (e.g., Insectoid):").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.new_body_class_name_entry = ttk.Entry(form_frame)
         self.new_body_class_name_entry.grid(row=0, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
@@ -262,16 +262,51 @@ class MainWindow(tk.Tk):
         self.new_body_display_name_entry = ttk.Entry(form_frame)
         self.new_body_display_name_entry.grid(row=1, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
 
-        # Размер по умолчанию
-        ttk.Label(form_frame, text="Default Size:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.new_body_size_var = tk.StringVar(value="Medium")
-        size_combo = ttk.Combobox(form_frame, textvariable=self.new_body_size_var, values=["Tiny", "Small", "Medium", "Large", "Huge"], state="readonly")
-        size_combo.grid(row=2, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+        # Размер - диапазон высоты/роста
+        size_frame = ttk.LabelFrame(form_frame, text="Size Range")
+        size_frame.grid(row=2, column=0, columnspan=3, sticky=tk.EW, pady=5)
+        
+        # Переключатель типа измерения
+        self.height_type_var = tk.StringVar(value="standing")
+        height_type_frame = ttk.Frame(size_frame)
+        height_type_frame.grid(row=0, column=0, columnspan=4, sticky=tk.W, pady=5)
+        
+        ttk.Radiobutton(height_type_frame, text="Standing Height", variable=self.height_type_var, value="standing").pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Radiobutton(height_type_frame, text="Withers Height", variable=self.height_type_var, value="withers").pack(side=tk.LEFT)
+        
+        # Поля ввода диапазона
+        ttk.Label(size_frame, text="Min (cm):").grid(row=1, column=0, sticky=tk.W, pady=5, padx=(5, 0))
+        self.new_body_height_min_entry = ttk.Entry(size_frame, width=10)
+        self.new_body_height_min_entry.grid(row=1, column=1, sticky=tk.W, pady=5, padx=(0, 15))
+        self.new_body_height_min_entry.insert(0, "150")
+        
+        ttk.Label(size_frame, text="Max (cm):").grid(row=1, column=2, sticky=tk.W, pady=5, padx=(5, 0))
+        self.new_body_height_max_entry = ttk.Entry(size_frame, width=10)
+        self.new_body_height_max_entry.grid(row=1, column=3, sticky=tk.W, pady=5)
+        self.new_body_height_max_entry.insert(0, "200")
+        
+        # Автоматическое описание размера (только для чтения)
+        ttk.Label(size_frame, text="Auto Size Category:").grid(row=2, column=0, sticky=tk.W, pady=5, padx=(5, 0))
+        self.auto_size_label = ttk.Label(size_frame, text="Medium", font=("Arial", 10, "bold"))
+        self.auto_size_label.grid(row=2, column=1, sticky=tk.W, pady=5, padx=(0, 15), columnspan=2)
+        
+        # Привязка событий для авто-обновления размера
+        self.new_body_height_min_entry.bind('<KeyRelease>', self.update_auto_size)
+        self.new_body_height_max_entry.bind('<KeyRelease>', self.update_auto_size)
 
-        # Пол (опционально)
-        ttk.Label(form_frame, text="Default Gender (optional, leave empty for N/A):").grid(row=3, column=0, sticky=tk.W, pady=5)
-        self.new_body_gender_entry = ttk.Entry(form_frame)
-        self.new_body_gender_entry.grid(row=3, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+        # Пол - выпадающий список + custom поле
+        gender_frame = ttk.Frame(form_frame)
+        gender_frame.grid(row=3, column=0, columnspan=3, sticky=tk.EW, pady=5)
+        
+        ttk.Label(gender_frame, text="Gender:").pack(side=tk.LEFT, padx=(0, 10))
+        self.new_body_gender_var = tk.StringVar(value="N/A")
+        gender_combo = ttk.Combobox(gender_frame, textvariable=self.new_body_gender_var, 
+                                    values=["Male", "Female", "N/A", "Other"], state="readonly", width=12)
+        gender_combo.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Label(gender_frame, text="Custom (optional):").pack(side=tk.LEFT, padx=(10, 5))
+        self.new_body_gender_custom_entry = ttk.Entry(gender_frame, width=20)
+        self.new_body_gender_custom_entry.pack(side=tk.LEFT)
 
         # Части тела (интерактивное дерево)
         ttk.Label(form_frame, text="Body Parts Hierarchy:").grid(row=4, column=0, sticky=tk.W, pady=5)
@@ -366,6 +401,42 @@ class MainWindow(tk.Tk):
         self.bodies_listbox.delete(0, tk.END)
         for body_name in sorted(self.available_bodies.keys()):
             self.bodies_listbox.insert(tk.END, body_name)
+
+    def update_auto_size(self, event=None):
+        """Автоматически определяет категорию размера на основе диапазона высоты."""
+        try:
+            min_height = float(self.new_body_height_min_entry.get().strip() or 0)
+            max_height = float(self.new_body_height_max_entry.get().strip() or 0)
+            
+            # Используем среднее значение для определения категории
+            avg_height = (min_height + max_height) / 2 if max_height > 0 else min_height
+            
+            # Определяем категорию размера на основе средней высоты
+            # Для standing height (человеческий стандарт)
+            # Tiny: < 50cm, Small: 50-100cm, Medium: 100-200cm, Large: 200-350cm, Huge: > 350cm
+            if avg_height < 50:
+                size_category = "Tiny"
+            elif avg_height < 100:
+                size_category = "Small"
+            elif avg_height < 200:
+                size_category = "Medium"
+            elif avg_height < 350:
+                size_category = "Large"
+            else:
+                size_category = "Huge"
+            
+            self.auto_size_label.config(text=size_category)
+        except ValueError:
+            self.auto_size_label.config(text="Invalid")
+
+    def get_final_gender(self):
+        """Возвращает итоговое значение пола с учётом custom поля."""
+        base_gender = self.new_body_gender_var.get()
+        custom_gender = self.new_body_gender_custom_entry.get().strip()
+        
+        if custom_gender:
+            return custom_gender
+        return base_gender if base_gender else "N/A"
 
     def update_body_parts_tree(self):
         """Обновляет дерево частей тела на основе current_body_structure с сохранением состояния раскрытия."""
@@ -651,19 +722,26 @@ class MainWindow(tk.Tk):
         """Обработчик создания нового типа тела через интерфейс."""
         class_name = self.new_body_class_name_entry.get().strip()
         display_name = self.new_body_display_name_entry.get().strip()
-        default_size = self.new_body_size_var.get().strip()
-        default_gender = self.new_body_gender_entry.get().strip()
+        
+        # Получаем размер из авто-категории
+        default_size = self.auto_size_label.cget("text")
+        
+        # Получаем пол с учётом custom поля
+        default_gender = self.get_final_gender()
+        
         desc_template = self.new_body_desc_template_entry.get().strip()
 
         # Валидация
         if not class_name:
             messagebox.showwarning("Invalid Input", "Class Name is required.")
             return
-        if not class_name.endswith("Body"):
-             messagebox.showwarning("Invalid Input", "Class Name should end with 'Body' (e.g., InsectoidBody).")
-             return
+        # Убираем проверку на окончание "Body" - теперь добавляем автоматически
         if not display_name:
-            display_name = class_name.replace("Body", "")
+            display_name = class_name
+        
+        # Добавляем "Body" к имени класса если нет
+        if not class_name.endswith("Body"):
+            class_name = class_name + "Body"
         
         # Проверка на дубликат
         if class_name in self.available_bodies:
@@ -679,6 +757,10 @@ class MainWindow(tk.Tk):
 
         # Используем текущую структуру напрямую
         body_structure = dict(self.current_body_structure)
+        
+        # Конвертируем ключ None в строку "null" для JSON совместимости
+        if None in body_structure:
+            body_structure["null"] = body_structure.pop(None)
 
         # Если шаблон пустой, используем дефолтный
         if not desc_template:
@@ -718,9 +800,14 @@ class MainWindow(tk.Tk):
             # Очищаем поля формы и дерево
             self.new_body_class_name_entry.delete(0, tk.END)
             self.new_body_display_name_entry.delete(0, tk.END)
-            self.new_body_gender_entry.delete(0, tk.END)
+            self.new_body_gender_var.set("N/A")
+            self.new_body_gender_custom_entry.delete(0, tk.END)
             self.new_body_desc_template_entry.delete(0, tk.END)
-            self.new_body_size_var.set("Medium")
+            self.new_body_height_min_entry.delete(0, tk.END)
+            self.new_body_height_min_entry.insert(0, "150")
+            self.new_body_height_max_entry.delete(0, tk.END)
+            self.new_body_height_max_entry.insert(0, "200")
+            self.update_auto_size()  # Обновить авто-размер
             
             # Сбрасываем структуру и дерево
             self.current_body_structure = {None: []}
@@ -767,26 +854,52 @@ class MainWindow(tk.Tk):
             
             # Заполняем поля формы
             self.new_body_class_name_entry.delete(0, tk.END)
-            self.new_body_class_name_entry.insert(0, data.get("class_name", body_name))
+            # Убираем "Body" из конца имени класса для отображения
+            class_name = data.get("class_name", body_name)
+            if class_name.endswith("Body"):
+                class_name = class_name[:-4]
+            self.new_body_class_name_entry.insert(0, class_name)
             
             display_name = data.get("display_name", body_name.replace("Body", ""))
             self.new_body_display_name_entry.delete(0, tk.END)
             self.new_body_display_name_entry.insert(0, display_name)
             
-            self.new_body_size_var.set(data.get('size', 'Medium'))
+            # Размер теперь определяется через диапазон высот
+            # Для обратной совместимости используем дефолтные значения
+            size_category = data.get('size', 'Medium')
+            # Устанавливаем примерные значения высоты на основе категории размера
+            height_ranges = {
+                "Tiny": (20, 50),
+                "Small": (50, 100),
+                "Medium": (150, 200),
+                "Large": (200, 350),
+                "Huge": (350, 600)
+            }
+            min_h, max_h = height_ranges.get(size_category, (150, 200))
+            self.new_body_height_min_entry.delete(0, tk.END)
+            self.new_body_height_min_entry.insert(0, str(min_h))
+            self.new_body_height_max_entry.delete(0, tk.END)
+            self.new_body_height_max_entry.insert(0, str(max_h))
+            self.update_auto_size()  # Обновить авто-категорию
             
-            gender = data.get('gender', '')
-            if gender and gender != "N/A":
-                self.new_body_gender_entry.delete(0, tk.END)
-                self.new_body_gender_entry.insert(0, gender)
+            # Пол - разбираем и устанавливаем в соответствующие поля
+            gender = data.get('gender', 'N/A')
+            standard_genders = ["Male", "Female", "N/A", "Other"]
+            if gender in standard_genders:
+                self.new_body_gender_var.set(gender)
+                self.new_body_gender_custom_entry.delete(0, tk.END)
             else:
-                self.new_body_gender_entry.delete(0, tk.END)
+                self.new_body_gender_var.set("Other")
+                self.new_body_gender_custom_entry.delete(0, tk.END)
+                self.new_body_gender_custom_entry.insert(0, gender)
             
             # Загружаем структуру частей тела
             body_structure = data.get('body_structure', {})
-            # Конвертируем ключ "None" из строки обратно в None
-            if "None" in body_structure:
-                body_structure[None] = body_structure.pop("None")
+            # Конвертируем ключ "null" или "None" из строки обратно в None
+            for null_key in ["null", "None"]:
+                if null_key in body_structure:
+                    body_structure[None] = body_structure.pop(null_key)
+                    break
             
             # Также нужно нормализовать все части в списках до словарей {name, tags}
             for key in body_structure:
