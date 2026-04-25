@@ -52,10 +52,15 @@ def load_available_modules_and_bodies(components_dir="modules", bodies_dir="bodi
                     
                     class_name = data.get("class_name")
                     if class_name:
-                        # Создаем динамический экземпляр тела
-                        body_instance = DynamicBody.from_dict(data)
+                        # Сохраняем ДИНАМИЧЕСКИЙ КЛАСС (callable), а не экземпляр
+                        # Создаём фабрику которая будет создавать экземпляры при вызове
+                        def make_body_factory(body_data):
+                            def factory(**kwargs):
+                                return DynamicBody.from_dict(body_data)
+                            return factory
+                        
+                        available_bodies[class_name] = make_body_factory(data)
                         print(f"  Found body class (JSON): {class_name}")
-                        available_bodies[class_name] = body_instance
                 except Exception as e:
                     print(f"  Error loading body JSON {filename}: {e}")
     else:
