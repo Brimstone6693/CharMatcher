@@ -57,6 +57,9 @@ class BodyTypeManager:
         self.bodies_listbox = None
         self.body_list_menu = None
         
+        # Буфер для копирования/вставки частей
+        self.clipboard_parts = None
+        
         # Загружаем доступные модули и тела
         self._reload_available_bodies()
     
@@ -73,8 +76,38 @@ class BodyTypeManager:
         for widget in self.parent.winfo_children():
             widget.destroy()
         
-        frame = ttk.Frame(self.parent)
-        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        # Настраиваем основное окно с прокруткой
+        main_frame = ttk.Frame(self.parent)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Создаем Canvas для прокрутки
+        canvas = tk.Canvas(main_frame)
+        scrollbar_y = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar_y.set)
+        
+        # Привязка изменения размера окна для обновления ширины canvas
+        def on_canvas_configure(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+        
+        canvas.bind("<Configure>", on_canvas_configure)
+        
+        # Привязка колесика мыши для прокрутки
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar_y.pack(side="right", fill="y")
+        
+        frame = scrollable_frame
         
         ttk.Label(frame, text="Manage Body Types", font=("Arial", 14, "bold")).pack(pady=10)
         
@@ -163,6 +196,22 @@ class BodyTypeManager:
         self.body_parts_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar_tree.pack(side=tk.RIGHT, fill=tk.Y)
         
+        # Контекстное меню для дерева частей тела
+        self.tree_menu = tk.Menu(self.parent, tearoff=0)
+        self.tree_menu.add_command(label="Copy", command=self.on_copy_parts)
+        self.tree_menu.add_command(label="Paste", command=self.on_paste_parts)
+        self.tree_menu.add_separator()
+        self.tree_menu.add_command(label="Add Child Part", command=self.on_add_child_part)
+        self.tree_menu.add_command(label="Rename Part", command=self.on_rename_part)
+        self.tree_menu.add_command(label="Delete Part", command=self.on_delete_part)
+        
+        # Привязка контекстного меню и горячих клавиш к дереву
+        self.body_parts_tree.bind("<Button-3>", self.on_tree_right_click)
+        self.body_parts_tree.bind("<Control-c>", lambda e: self.on_copy_parts())
+        self.body_parts_tree.bind("<Control-v>", lambda e: self.on_paste_parts())
+        self.body_parts_tree.bind("<Delete>", lambda e: self.on_delete_part())
+        self.body_parts_tree.bind("<F2>", lambda e: self.on_rename_part())
+        
         # Легенда убрана - она мешала и была избыточна
         
         # Кнопки управления деревом
@@ -179,7 +228,13 @@ class BodyTypeManager:
         delete_part_btn.pack(side=tk.LEFT, padx=(0, 5))
         
         rename_part_btn = ttk.Button(btn_frame, text="Rename Part", command=self.on_rename_part)
-        rename_part_btn.pack(side=tk.LEFT)
+        rename_part_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        copy_part_btn = ttk.Button(btn_frame, text="Copy", command=self.on_copy_parts)
+        copy_part_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        paste_part_btn = ttk.Button(btn_frame, text="Paste", command=self.on_paste_parts)
+        paste_part_btn.pack(side=tk.LEFT)
         
         # Хранилище для структуры частей тела (словарь)
         self.current_body_structure = {None: []}
@@ -215,9 +270,12 @@ class BodyTypeManager:
         self.body_list_menu.add_command(label="Copy", command=self.on_copy_body_type)
         self.body_list_menu.add_command(label="Delete", command=self.on_delete_body_type)
         
-        # Привязка контекстного меню к списку
+        # Привязка контекстного меню к списку и горячих клавиш
         self.bodies_listbox.bind("<Button-3>", self.on_body_list_right_click)
         self.bodies_listbox.bind("<Double-Button-1>", lambda e: self.on_load_body_to_editor())
+        self.bodies_listbox.bind("<Control-c>", lambda e: self.on_copy_body_type())
+        self.bodies_listbox.bind("<Control-v>", lambda e: messagebox.showinfo("Info", "Paste is not available for body types list.", parent=self.parent))
+        self.bodies_listbox.bind("<Delete>", lambda e: self.on_delete_body_type())
         
         # Заполняем список
         self.refresh_bodies_list()
@@ -229,7 +287,7 @@ class BodyTypeManager:
         back_btn = ttk.Button(frame, text="Back to Start", command=self.show_start_screen)
         back_btn.pack(pady=5)
         
-        return frame
+        return main_frame
     
     def show_start_screen(self):
         """Возвращает к начальному экрану (делегирование родительскому окну)."""
@@ -359,10 +417,23 @@ class BodyTypeManager:
             add_children(node_id, part_name)
     
     def on_add_root_part(self):
-        """Добавляет корневую часть тела (к ключу None)."""
+        """Добавляет корневую часть тела (к ключу None) как дочернюю к Body."""
+        # Проверяем, существует ли корневой элемент "Body"
+        root_parts = self.current_body_structure.get(None, [])
+        body_exists = any((isinstance(p, dict) and p.get("name") == "Body") or p == "Body" for p in root_parts)
+        
+        if not body_exists:
+            messagebox.showwarning("Error", "Root 'Body' part is missing. Please reinitialize the structure.", parent=self.parent)
+            return
+        
         dialog = tk.Toplevel(self.parent)
         dialog.title("Add Root Body Part")
         dialog.geometry("350x180")
+        # Центрируем диалог относительно родительского окна
+        dialog.update_idletasks()
+        x = self.parent.winfo_x() + (self.parent.winfo_width() - dialog.winfo_width()) // 2
+        y = self.parent.winfo_y() + (self.parent.winfo_height() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
         dialog.transient(self.parent)
         dialog.grab_set()
         
@@ -384,8 +455,10 @@ class BodyTypeManager:
                 messagebox.showwarning("Invalid Input", "Part name cannot be empty.", parent=dialog)
                 return
             
-            # Добавляем как словарь с именем и тегами
-            self.current_body_structure[None].append({"name": name, "tags": tags})
+            # Добавляем как словарь с именем и тегами в список детей "Body"
+            if "Body" not in self.current_body_structure:
+                self.current_body_structure["Body"] = []
+            self.current_body_structure["Body"].append({"name": name, "tags": tags})
             if name not in self.current_body_structure:
                 self.current_body_structure[name] = []
             
@@ -408,6 +481,11 @@ class BodyTypeManager:
         dialog = tk.Toplevel(self.parent)
         dialog.title(f"Add Child to '{parent_name}'")
         dialog.geometry("350x180")
+        # Центрируем диалог относительно родительского окна
+        dialog.update_idletasks()
+        x = self.parent.winfo_x() + (self.parent.winfo_width() - dialog.winfo_width()) // 2
+        y = self.parent.winfo_y() + (self.parent.winfo_height() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
         dialog.transient(self.parent)
         dialog.grab_set()
         
@@ -493,6 +571,11 @@ class BodyTypeManager:
         dialog = tk.Toplevel(self.parent)
         dialog.title(f"Rename '{old_name}'")
         dialog.geometry("350x150")
+        # Центрируем диалог относительно родительского окна
+        dialog.update_idletasks()
+        x = self.parent.winfo_x() + (self.parent.winfo_width() - dialog.winfo_width()) // 2
+        y = self.parent.winfo_y() + (self.parent.winfo_height() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
         dialog.transient(self.parent)
         dialog.grab_set()
         
@@ -537,6 +620,94 @@ class BodyTypeManager:
             dialog.destroy()
         
         ttk.Button(dialog, text="Rename", command=confirm).pack(pady=10)
+    
+    def on_copy_parts(self):
+        """Копирует выбранные части тела в буфер обмена."""
+        selection = self.body_parts_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select part(s) to copy.", parent=self.parent)
+            return
+        
+        # Копируем выбранные части и их дочерние элементы
+        self.clipboard_parts = []
+        for item in selection:
+            part_name = self.body_parts_tree.item(item)["text"].split(" [")[0]
+            part_tags = []
+            tags_val = self.body_parts_tree.item(item)["values"]
+            if tags_val and len(tags_val) > 0 and tags_val[0]:
+                tags_str = tags_val[0].strip("[]")
+                if tags_str:
+                    part_tags = [t.strip() for t in tags_str.split(",")]
+            
+            # Копируем структуру части с детьми
+            part_data = {"name": part_name, "tags": part_tags, "children": []}
+            self._copy_subtree(part_name, part_data["children"])
+            self.clipboard_parts.append(part_data)
+        
+        messagebox.showinfo("Copy", f"Copied {len(self.clipboard_parts)} part(s) to clipboard.", parent=self.parent)
+    
+    def _copy_subtree(self, part_name, children_list):
+        """Рекурсивно копирует поддерево части."""
+        children = self.current_body_structure.get(part_name, [])
+        for child in children:
+            child_name = child["name"] if isinstance(child, dict) else child
+            child_tags = child.get("tags", []) if isinstance(child, dict) else []
+            child_data = {"name": child_name, "tags": child_tags, "children": []}
+            children_list.append(child_data)
+            self._copy_subtree(child_name, child_data["children"])
+    
+    def on_paste_parts(self):
+        """Вставляет части из буфера обмена к выбранному родителю или как корневые."""
+        if not self.clipboard_parts:
+            messagebox.showwarning("Clipboard Empty", "No parts to paste. Please copy parts first.", parent=self.parent)
+            return
+        
+        selection = self.body_parts_tree.selection()
+        if not selection:
+            # Если ничего не выбрано, спрашиваем куда вставлять
+            result = messagebox.askquestion("Paste Location", "No part selected. Paste as children of 'Body'?", parent=self.parent)
+            if result == 'yes':
+                parent_name = "Body"
+            else:
+                return
+        else:
+            parent_name = self.body_parts_tree.item(selection[0])["text"].split(" [")[0]
+        
+        # Вставляем скопированные части
+        if parent_name not in self.current_body_structure:
+            self.current_body_structure[parent_name] = []
+        
+        def add_part_with_children(part_data, parent_key):
+            """Рекурсивно добавляет часть и её детей."""
+            name = part_data["name"]
+            tags = part_data.get("tags", [])
+            
+            # Проверяем на дубликат имени у родителя
+            existing_names = set()
+            for existing in self.current_body_structure.get(parent_key, []):
+                existing_name = existing["name"] if isinstance(existing, dict) else existing
+                existing_names.add(existing_name)
+            
+            # Если имя уже существует, добавляем суффикс
+            base_name = name
+            counter = 1
+            while name in existing_names:
+                name = f"{base_name}_{counter}"
+                counter += 1
+            
+            self.current_body_structure[parent_key].append({"name": name, "tags": tags})
+            if name not in self.current_body_structure:
+                self.current_body_structure[name] = []
+            
+            # Добавляем детей
+            for child_data in part_data.get("children", []):
+                add_part_with_children(child_data, name)
+        
+        for part_data in self.clipboard_parts:
+            add_part_with_children(part_data, parent_name)
+        
+        self.update_body_parts_tree()
+        messagebox.showinfo("Paste", "Parts pasted successfully.", parent=self.parent)
     
     def on_create_body_type_clicked(self):
         """Обработчик создания нового типа тела через интерфейс."""
@@ -586,6 +757,17 @@ class BodyTypeManager:
         if not desc_template:
             desc_template = f"A {{size}} {{gender}} {display_name}."
         
+        # Получаем тип высоты (standing или withers)
+        height_type = self.height_type_var.get()
+        
+        # Получаем диапазон высоты
+        try:
+            height_min = float(self.new_body_height_min_entry.get().strip())
+            height_max = float(self.new_body_height_max_entry.get().strip())
+        except ValueError:
+            height_min = 150.0
+            height_max = 200.0
+        
         # Создаем словарь данных для JSON
         body_data = {
             "class_name": class_name,
@@ -594,7 +776,10 @@ class BodyTypeManager:
             "gender": default_gender if default_gender else "N/A",
             "display_name": display_name,
             "description_template": desc_template,
-            "body_structure": body_structure
+            "body_structure": body_structure,
+            "height_type": height_type,
+            "height_min_cm": height_min,
+            "height_max_cm": height_max
         }
         
         # Сохранение файла JSON
@@ -636,6 +821,19 @@ class BodyTypeManager:
             
         except Exception as e:
             messagebox.showerror("Creation Error", f"Failed to create body type file:\n{e}")
+    
+    def on_tree_right_click(self, event):
+        """Обработчик правого клика по дереву частей тела."""
+        # Выбираем элемент под курсором
+        item = self.body_parts_tree.identify_row(event.y)
+        if item:
+            self.body_parts_tree.selection_set(item)
+        
+        # Показываем контекстное меню
+        try:
+            self.tree_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.tree_menu.grab_release()
     
     def on_body_list_right_click(self, event):
         """Обработчик правого клика по списку типов тел."""
@@ -683,18 +881,26 @@ class BodyTypeManager:
             self.new_body_display_name_entry.delete(0, tk.END)
             self.new_body_display_name_entry.insert(0, display_name)
             
-            # Размер теперь определяется через диапазон высот
-            # Для обратной совместимости используем дефолтные значения
-            size_category = data.get('size', 'Medium')
-            # Устанавливаем примерные значения высоты на основе категории размера
-            height_ranges = {
-                "Tiny": (20, 50),
-                "Small": (50, 100),
-                "Medium": (150, 200),
-                "Large": (200, 350),
-                "Huge": (350, 600)
-            }
-            min_h, max_h = height_ranges.get(size_category, (150, 200))
+            # Размер и тип высоты - загружаем из данных или используем дефолтные значения
+            height_type = data.get('height_type', 'standing')
+            self.height_type_var.set(height_type)
+            
+            # Загружаем диапазон высот если есть, иначе определяем по размеру
+            if 'height_min_cm' in data and 'height_max_cm' in data:
+                min_h = data['height_min_cm']
+                max_h = data['height_max_cm']
+            else:
+                # Для обратной совместимости используем примерные значения на основе категории размера
+                size_category = data.get('size', 'Medium')
+                height_ranges = {
+                    "Tiny": (20, 50),
+                    "Small": (50, 100),
+                    "Medium": (150, 200),
+                    "Large": (200, 350),
+                    "Huge": (350, 600)
+                }
+                min_h, max_h = height_ranges.get(size_category, (150, 200))
+            
             self.new_body_height_min_entry.delete(0, tk.END)
             self.new_body_height_min_entry.insert(0, str(min_h))
             self.new_body_height_max_entry.delete(0, tk.END)
@@ -760,6 +966,11 @@ class BodyTypeManager:
         dialog = tk.Toplevel(self.parent)
         dialog.title(f"Rename '{old_name}'")
         dialog.geometry("400x150")
+        # Центрируем диалог относительно родительского окна
+        dialog.update_idletasks()
+        x = self.parent.winfo_x() + (self.parent.winfo_width() - dialog.winfo_width()) // 2
+        y = self.parent.winfo_y() + (self.parent.winfo_height() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
         dialog.transient(self.parent)
         dialog.grab_set()
         
