@@ -8,6 +8,7 @@ import os
 import json
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import copy  # Импортируем модуль для глубокого копирования
 from module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
 
 
@@ -60,6 +61,11 @@ class BodyTypeManager:
         # Буфер для копирования/вставки частей
         self.clipboard_parts = None
         
+        # История действий для Undo/Redo
+        self.action_history = []
+        self.redo_stack = []
+        self.max_history_size = 50
+        
         # Загружаем доступные модули и тела
         self._reload_available_bodies()
     
@@ -109,7 +115,19 @@ class BodyTypeManager:
         
         frame = scrollable_frame
         
-        ttk.Label(frame, text="Manage Body Types", font=("Arial", 14, "bold")).pack(pady=10)
+        # Создаем топ бар с основными функциями
+        top_bar = ttk.Frame(frame)
+        top_bar.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(top_bar, text="Manage Body Types", font=("Arial", 14, "bold")).pack(side=tk.LEFT, padx=(0, 20))
+        
+        undo_btn = ttk.Button(top_bar, text="Undo (Ctrl+Z)", command=self.on_undo)
+        undo_btn.pack(side=tk.LEFT, padx=5)
+        
+        redo_btn = ttk.Button(top_bar, text="Redo (Ctrl+Y)", command=self.on_redo)
+        redo_btn.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(frame, text="Add New Body Type", font=("Arial", 12, "bold")).pack(pady=(10, 5))
         
         # Форма добавления нового типа тела
         form_frame = ttk.LabelFrame(frame, text="Add New Body Type")
@@ -204,6 +222,9 @@ class BodyTypeManager:
         self.tree_menu.add_command(label="Add Child Part", command=self.on_add_child_part)
         self.tree_menu.add_command(label="Rename Part", command=self.on_rename_part)
         self.tree_menu.add_command(label="Delete Part", command=self.on_delete_part)
+        self.tree_menu.add_separator()
+        self.tree_menu.add_command(label="Undo (Ctrl+Z)", command=self.on_undo)
+        self.tree_menu.add_command(label="Redo (Ctrl+Y)", command=self.on_redo)
         
         # Привязка контекстного меню и горячих клавиш к дереву
         self.body_parts_tree.bind("<Button-3>", self.on_tree_right_click)
@@ -211,6 +232,8 @@ class BodyTypeManager:
         self.body_parts_tree.bind("<Control-v>", lambda e: self.on_paste_parts())
         self.body_parts_tree.bind("<Delete>", lambda e: self.on_delete_part())
         self.body_parts_tree.bind("<F2>", lambda e: self.on_rename_part())
+        self.body_parts_tree.bind("<Control-z>", lambda e: self.on_undo())
+        self.body_parts_tree.bind("<Control-y>", lambda e: self.on_redo())
         
         # Легенда убрана - она мешала и была избыточна
         
@@ -462,6 +485,9 @@ class BodyTypeManager:
             if name not in self.current_body_structure:
                 self.current_body_structure[name] = []
             
+            # Сохраняем состояние для Undo
+            self._save_action_state("add_root", {"name": name, "tags": tags, "parent": "Body"})
+            
             self.update_body_parts_tree()
             dialog.destroy()
         
@@ -515,6 +541,9 @@ class BodyTypeManager:
             if name not in self.current_body_structure:
                 self.current_body_structure[name] = []
             
+            # Сохраняем состояние для Undo
+            self._save_action_state("add_child", {"name": name, "tags": tags, "parent": parent_name})
+            
             self.update_body_parts_tree()
             dialog.destroy()
         
@@ -536,6 +565,9 @@ class BodyTypeManager:
         
         if not messagebox.askyesno("Confirm Delete", "Are you sure you want to delete the selected part(s)?", parent=self.parent):
             return
+        
+        # Сохраняем состояние для Undo перед удалением
+        self._save_action_state("delete", list(selection))
         
         # Удаляем выбранные части
         for item in selection:
@@ -616,6 +648,9 @@ class BodyTypeManager:
             if old_name in self.current_body_structure:
                 self.current_body_structure[new_name] = self.current_body_structure.pop(old_name)
             
+            # Сохраняем состояние для Undo
+            self._save_action_state("rename", {"old_name": old_name, "new_name": new_name})
+            
             self.update_body_parts_tree()
             dialog.destroy()
         
@@ -673,6 +708,9 @@ class BodyTypeManager:
         else:
             parent_name = self.body_parts_tree.item(selection[0])["text"].split(" [")[0]
         
+        # Создаем глубокую копию данных буфера обмена для предотвращения проблем с ссылками
+        parts_to_paste = copy.deepcopy(self.clipboard_parts)
+        
         # Вставляем скопированные части
         if parent_name not in self.current_body_structure:
             self.current_body_structure[parent_name] = []
@@ -703,8 +741,11 @@ class BodyTypeManager:
             for child_data in part_data.get("children", []):
                 add_part_with_children(child_data, name)
         
-        for part_data in self.clipboard_parts:
+        for part_data in parts_to_paste:
             add_part_with_children(part_data, parent_name)
+        
+        # Сохраняем состояние для Undo
+        self._save_action_state("paste", {"parts": parts_to_paste, "parent": parent_name})
         
         self.update_body_parts_tree()
         messagebox.showinfo("Paste", "Parts pasted successfully.", parent=self.parent)
@@ -848,6 +889,61 @@ class BodyTypeManager:
             self.body_list_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self.body_list_menu.grab_release()
+    
+    def _save_action_state(self, action_type, data):
+        """Сохраняет состояние действия для возможности Undo."""
+        # Сохраняем полную копию текущей структуры
+        state_copy = copy.deepcopy(self.current_body_structure)
+        self.action_history.append({
+            "action": action_type,
+            "data": data,
+            "state": state_copy
+        })
+        
+        # Ограничиваем размер истории
+        if len(self.action_history) > self.max_history_size:
+            self.action_history.pop(0)
+        
+        # Очищаем redo стек при новом действии
+        self.redo_stack.clear()
+    
+    def on_undo(self):
+        """Отменяет последнее действие."""
+        if not self.action_history:
+            messagebox.showinfo("Undo", "Nothing to undo.", parent=self.parent)
+            return
+        
+        # Сохраняем текущее состояние для Redo
+        current_state = copy.deepcopy(self.current_body_structure)
+        last_action = self.action_history.pop()
+        self.redo_stack.append({
+            "action": last_action["action"],
+            "data": last_action["data"],
+            "state": current_state
+        })
+        
+        # Восстанавливаем предыдущее состояние
+        self.current_body_structure = copy.deepcopy(last_action["state"])
+        self.update_body_parts_tree()
+    
+    def on_redo(self):
+        """Повторяет отмененное действие."""
+        if not self.redo_stack:
+            messagebox.showinfo("Redo", "Nothing to redo.", parent=self.parent)
+            return
+        
+        # Сохраняем текущее состояние для Undo
+        current_state = copy.deepcopy(self.current_body_structure)
+        redo_action = self.redo_stack.pop()
+        self.action_history.append({
+            "action": redo_action["action"],
+            "data": redo_action["data"],
+            "state": current_state
+        })
+        
+        # Восстанавливаем состояние
+        self.current_body_structure = copy.deepcopy(redo_action["state"])
+        self.update_body_parts_tree()
     
     def on_load_body_to_editor(self):
         """Загружает выбранный тип тела в редактор для просмотра/редактирования."""
