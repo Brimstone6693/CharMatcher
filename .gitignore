@@ -1,1 +1,4 @@
-Nothing should be ignored based on the provided file changes. The only modified file is `gui_main.py`, which is a Python source file and should not be ignored. There are no build artifacts, dependencies, or temporary files in the changes that would warrant adding ignore rules.
+```
+__pycache__/
+*.pyc
+```

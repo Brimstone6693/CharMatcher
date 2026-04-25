@@ -244,10 +244,6 @@ class MainWindow(tk.Tk):
             self.body_manager = BodyTypeManager(self)
         
         self.body_manager.create_manage_bodies_screen()
-        
-        # Кнопка назад
-        back_btn = ttk.Button(frame, text="Back to Start", command=self.show_start_screen)
-        back_btn.pack(pady=5)
 
     def init_body_structure_with_root(self):
         """Инициализирует структуру тела с обязательной корневой частью 'Body'."""
