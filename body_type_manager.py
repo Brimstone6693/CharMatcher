@@ -164,10 +164,10 @@ class BodyTypeManager:
         workspace.grid_rowconfigure(0, weight=1)
         
         # Левая панель для дополнительных инструментов (список частей или теги)
-        left_panel_container = ttk.Frame(workspace)
-        left_panel_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
-        left_panel_container.grid_rowconfigure(0, weight=1)
-        left_panel_container.grid_columnconfigure(0, weight=1)
+        self.left_panel_container = ttk.Frame(workspace)
+        self.left_panel_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        self.left_panel_container.grid_rowconfigure(0, weight=1)
+        self.left_panel_container.grid_columnconfigure(0, weight=1)
         
         # Центральная часть: Дерево частей тела
         tree_container = ttk.LabelFrame(workspace, text="Body Parts Structure", padding=5)
