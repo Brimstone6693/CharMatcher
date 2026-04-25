@@ -49,7 +49,7 @@ Thumbs.db
 build/
 dist/
 target/
-```
+
 # MyPy
 .mypy_cache/
 
@@ -79,4 +79,4 @@ target/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```
+
