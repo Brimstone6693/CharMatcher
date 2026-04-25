@@ -158,13 +158,16 @@ class BodyTypeManager:
         # --- Основная рабочая область ---
         workspace = ttk.Frame(main_frame)
         workspace.grid(row=1, column=0, sticky="nsew")
-        workspace.grid_columnconfigure(0, weight=1)  # Центральная колонка растягивается
-        workspace.grid_rowconfigure(0, weight=1)     # Верхняя строка (дерево) растягивается
-        workspace.grid_rowconfigure(1, weight=0)     # Нижняя строка (левая панель) фиксирована
+        workspace.grid_columnconfigure(0, weight=3)  # Левая панель (когда видима)
+        workspace.grid_columnconfigure(1, weight=10) # Основное дерево
+        workspace.grid_rowconfigure(0, weight=1)     # Все содержимое растягивается
         
-        # Центральная часть: Дерево частей тела (занимает всю ширину по умолчанию)
+        # Контейнер для левой панели будет размещен в column=0
+        # Дерево частей тела будет размещено в column=1 и займет всю доступную ширину когда левая панель скрыта
+        
+        # Центральная часть: Дерево частей тела (занимает column=1, растягивается)
         tree_container = ttk.LabelFrame(workspace, text="Body Parts Structure", padding=5)
-        tree_container.grid(row=0, column=0, sticky="nsew", columnspan=2)
+        tree_container.grid(row=0, column=1, sticky="nsew")
         tree_container.grid_columnconfigure(0, weight=1)
         tree_container.grid_rowconfigure(0, weight=1)
         
@@ -206,9 +209,9 @@ class BodyTypeManager:
         # Привязка горячих клавиш
         self._bind_shortcuts()
         
-        # Правая панель: Свойства и список тел (теперь в нижней строке)
+        # Правая панель: Свойства и список тел (теперь под деревом в column=1)
         right_panel = ttk.Frame(workspace)
-        right_panel.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
+        right_panel.grid(row=1, column=1, sticky="nsew", pady=(5, 0))
         right_panel.grid_rowconfigure(0, weight=1)  # Список тел растягивается
         right_panel.grid_columnconfigure(0, weight=1)
         
@@ -300,9 +303,10 @@ class BodyTypeManager:
         
         # Контейнер для левой панели (список частей/теги) - скрыт по умолчанию
         self.left_panel_container = ttk.Frame(workspace)
-        self.left_panel_container.grid(row=1, column=0, sticky="nsew", padx=(0, 5))
+        self.left_panel_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         self.left_panel_container.grid_remove()  # Скрываем по умолчанию
-        self.left_panel_container.grid_rowconfigure(0, weight=1)
+        self.left_panel_container.grid_rowconfigure(0, weight=1)  # Для списка частей
+        self.left_panel_container.grid_rowconfigure(1, weight=1)  # Для тегов
         self.left_panel_container.grid_columnconfigure(0, weight=1)
         
         # Привязка горячих клавиш
@@ -351,6 +355,10 @@ class BodyTypeManager:
         if self.parts_list_frame is not None:
             # Если фрейм уже создан, просто показываем его
             self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
+            # Скрываем теги если они были видны (только одна вкладка активна)
+            if self.tags_manager_visible:
+                self.tags_manager_frame.grid_remove()
+            self._update_left_panel_layout()
             self.parts_list_visible = True
             self.toggle_parts_list_btn.config(text="📋 Hide List")
             self.update_parts_list_tree()
@@ -411,7 +419,11 @@ class BodyTypeManager:
         
         if self.tags_manager_frame is not None:
             # Если фрейм уже создан, просто показываем его
-            self.tags_manager_frame.grid(row=0, column=0, sticky="nsew")
+            self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
+            # Скрываем список частей если он был виден (только одна вкладка активна)
+            if self.parts_list_visible:
+                self.parts_list_frame.grid_remove()
+            self._update_left_panel_layout()
             self.tags_manager_visible = True
             self.toggle_tags_manager_btn.config(text="🏷️ Hide Tags")
             self.update_tags_manager_tree()
@@ -419,7 +431,7 @@ class BodyTypeManager:
         
         # Создаем новую панель для менеджера тегов в левом контейнере
         self.tags_manager_frame = ttk.LabelFrame(self.left_panel_container, text="Tags Manager (Drag & Drop to Tree)", padding=5)
-        self.tags_manager_frame.grid(row=0, column=0, sticky="nsew")
+        self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
         self.tags_manager_frame.grid_columnconfigure(0, weight=1)
         self.tags_manager_frame.grid_rowconfigure(0, weight=1)
         
@@ -468,12 +480,38 @@ class BodyTypeManager:
         if self.tags_manager_frame is not None:
             self.tags_manager_frame.grid_remove()
         
+        # Показываем список частей если он был скрыт
+        if self.parts_list_visible and self.parts_list_frame is not None:
+            self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
+            self._update_left_panel_layout()
+        
         # Скрываем левый контейнер если список частей тоже скрыт
         if not self.parts_list_visible:
             self.left_panel_container.grid_remove()
         
         self.tags_manager_visible = False
         self.toggle_tags_manager_btn.config(text="🏷️ Tags")
+    
+    def _update_left_panel_layout(self):
+        """Обновляет layout левой панели в зависимости от видимых элементов."""
+        # Если оба элемента видны, показываем их один под другим
+        if self.parts_list_visible and self.tags_manager_visible:
+            if self.parts_list_frame:
+                self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
+            if self.tags_manager_frame:
+                self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
+        # Если только список частей виден
+        elif self.parts_list_visible and not self.tags_manager_visible:
+            if self.parts_list_frame:
+                self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
+            if self.tags_manager_frame:
+                self.tags_manager_frame.grid_remove()
+        # Если только теги видны
+        elif not self.parts_list_visible and self.tags_manager_visible:
+            if self.parts_list_frame:
+                self.parts_list_frame.grid_remove()
+            if self.tags_manager_frame:
+                self.tags_manager_frame.grid(row=0, column=0, sticky="nsew")
     
     def update_tags_manager_tree(self):
         """Обновляет дерево менеджера тегов."""
@@ -2184,6 +2222,8 @@ class BodyTypeManager:
                     break
             
             # Также нужно нормализовать все части в списках до словарей {name, tags}
+            # Создаем новый словарь чтобы избежать изменения во время итерации
+            normalized_structure = {}
             for key in body_structure:
                 normalized_list = []
                 for item in body_structure[key]:
@@ -2196,13 +2236,16 @@ class BodyTypeManager:
                         normalized_list.append(item)
                     else:
                         normalized_list.append(item)
-                body_structure[key] = normalized_list
+                normalized_structure[key] = normalized_list
             
-            self.current_body_structure = body_structure
+            self.current_body_structure = normalized_structure
             self.update_body_parts_tree()
             
-            # Обновляем список частей если он открыт
+            # Обновляем список частей если он открыт (теперь всегда обновляем после загрузки)
             if self.parts_list_visible:
+                self.update_parts_list_tree()
+            elif self.parts_list_frame is not None:
+                # Если фрейм существует но скрыт, тоже обновляем данные для следующего показа
                 self.update_parts_list_tree()
             
             # Очищаем историю действий при загрузке нового тела
