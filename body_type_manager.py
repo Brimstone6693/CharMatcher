@@ -158,12 +158,14 @@ class BodyTypeManager:
         # --- Основная рабочая область ---
         workspace = ttk.Frame(main_frame)
         workspace.grid(row=1, column=0, sticky="nsew")
-        workspace.grid_columnconfigure(0, weight=3)  # Левая панель (когда видима)
+        workspace.grid_columnconfigure(0, weight=0)  # Левая панель (когда видима)
         workspace.grid_columnconfigure(1, weight=10) # Основное дерево
+        workspace.grid_columnconfigure(2, weight=3)  # Правая панель (свойства и список тел)
         workspace.grid_rowconfigure(0, weight=1)     # Все содержимое растягивается
         
         # Контейнер для левой панели будет размещен в column=0
         # Дерево частей тела будет размещено в column=1 и займет всю доступную ширину когда левая панель скрыта
+        # Правая панель с свойствами будет в column=2
         
         # Центральная часть: Дерево частей тела (занимает column=1, растягивается)
         tree_container = ttk.LabelFrame(workspace, text="Body Parts Structure", padding=5)
@@ -209,10 +211,10 @@ class BodyTypeManager:
         # Привязка горячих клавиш
         self._bind_shortcuts()
         
-        # Правая панель: Свойства и список тел (теперь под деревом в column=1)
+        # Правая панель: Свойства и список тел (теперь справа от дерева в column=2)
         right_panel = ttk.Frame(workspace)
-        right_panel.grid(row=1, column=1, sticky="nsew", pady=(5, 0))
-        right_panel.grid_rowconfigure(0, weight=1)  # Список тел растягивается
+        right_panel.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
+        right_panel.grid_rowconfigure(1, weight=1)  # Список тел растягивается
         right_panel.grid_columnconfigure(0, weight=1)
         
         # Форма свойств тела
@@ -305,8 +307,7 @@ class BodyTypeManager:
         self.left_panel_container = ttk.Frame(workspace)
         self.left_panel_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         self.left_panel_container.grid_remove()  # Скрываем по умолчанию
-        self.left_panel_container.grid_rowconfigure(0, weight=1)  # Для списка частей
-        self.left_panel_container.grid_rowconfigure(1, weight=1)  # Для тегов
+        # Настраиваем row weights динамически в _update_left_panel_layout
         self.left_panel_container.grid_columnconfigure(0, weight=1)
         
         # Привязка горячих клавиш
@@ -361,7 +362,7 @@ class BodyTypeManager:
             self._update_left_panel_layout()
             self.parts_list_visible = True
             self.toggle_parts_list_btn.config(text="📋 Hide List")
-            self.update_parts_list_tree()
+            self.update_parts_list_tree()  # Обновляем данные при каждом показе
             return
         
         # Создаем новую панель для списка частей в левом контейнере
@@ -494,20 +495,28 @@ class BodyTypeManager:
     
     def _update_left_panel_layout(self):
         """Обновляет layout левой панели в зависимости от видимых элементов."""
-        # Если оба элемента видны, показываем их один под другим
+        # Сначала сбрасываем все row weights
+        self.left_panel_container.grid_rowconfigure(0, weight=0)
+        self.left_panel_container.grid_rowconfigure(1, weight=0)
+        
+        # Если оба элемента видны, показываем их один под другим с равным весом
         if self.parts_list_visible and self.tags_manager_visible:
+            self.left_panel_container.grid_rowconfigure(0, weight=1)
+            self.left_panel_container.grid_rowconfigure(1, weight=1)
             if self.parts_list_frame:
                 self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
             if self.tags_manager_frame:
                 self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
-        # Если только список частей виден
+        # Если только список частей виден - он занимает всё пространство
         elif self.parts_list_visible and not self.tags_manager_visible:
+            self.left_panel_container.grid_rowconfigure(0, weight=1)
             if self.parts_list_frame:
                 self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
             if self.tags_manager_frame:
                 self.tags_manager_frame.grid_remove()
-        # Если только теги видны
+        # Если только теги видны - они занимают всё пространство
         elif not self.parts_list_visible and self.tags_manager_visible:
+            self.left_panel_container.grid_rowconfigure(0, weight=1)
             if self.parts_list_frame:
                 self.parts_list_frame.grid_remove()
             if self.tags_manager_frame:
@@ -2037,6 +2046,12 @@ class BodyTypeManager:
             self.current_body_structure = {None: []}
             self.update_body_parts_tree()
             
+            # Обновляем список частей если он открыт
+            if self.parts_list_visible:
+                self.update_parts_list_tree()
+            elif self.parts_list_frame is not None:
+                self.update_parts_list_tree()
+            
             # Очищаем историю действий после создания нового тела
             self.action_history.clear()
             self.redo_stack.clear()
@@ -2247,6 +2262,9 @@ class BodyTypeManager:
             elif self.parts_list_frame is not None:
                 # Если фрейм существует но скрыт, тоже обновляем данные для следующего показа
                 self.update_parts_list_tree()
+            
+            # Также нужно обновить дерево основных частей тела
+            self.update_body_parts_tree()
             
             # Очищаем историю действий при загрузке нового тела
             self.action_history.clear()
