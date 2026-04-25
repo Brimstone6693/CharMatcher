@@ -185,6 +185,9 @@ class BodyTypeManager:
         self.body_parts_tree.bind("<Button-3>", self.on_tree_right_click)
         self.body_parts_tree.bind("<Double-1>", lambda e: self.on_rename_part())
         
+        # Привязка горячих клавиш
+        self._bind_shortcuts()
+        
         # Правая панель: Свойства и список тел
         right_panel = ttk.Frame(workspace)
         right_panel.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
@@ -249,6 +252,12 @@ class BodyTypeManager:
         ttk.Label(gender_frame, text="Custom:").pack(side=tk.LEFT, padx=(5, 2))
         self.new_body_gender_custom_entry = ttk.Entry(gender_frame, width=15)
         self.new_body_gender_custom_entry.pack(side=tk.LEFT)
+        
+        # Шаблон описания
+        ttk.Label(props_frame, text="Description Template:").grid(row=6, column=0, sticky=tk.W, pady=3)
+        self.new_body_desc_template_entry = ttk.Entry(props_frame)
+        self.new_body_desc_template_entry.grid(row=6, column=1, sticky="ew", pady=3)
+        self.new_body_desc_template_entry.insert(0, "A {size} {gender} {display_name}.")
         
         # Список сохраненных тел
         list_frame = ttk.LabelFrame(right_panel, text="Saved Body Types", padding=5)
@@ -1264,6 +1273,22 @@ class BodyTypeManager:
         # Восстанавливаем состояние
         self.current_body_structure = copy.deepcopy(redo_action["state"])
         self.update_body_parts_tree()
+    
+    def _bind_shortcuts(self):
+        """Привязывает горячие клавиши к функциям."""
+        # Копирование/Вставка
+        self.parent.bind("<Control-c>", lambda e: self.on_copy_parts())
+        self.parent.bind("<Control-v>", lambda e: self.on_paste_parts())
+        
+        # Undo/Redo
+        self.parent.bind("<Control-z>", lambda e: self.on_undo())
+        self.parent.bind("<Control-y>", lambda e: self.on_redo())
+        
+        # Удаление
+        self.parent.bind("<Delete>", lambda e: self.on_delete_part())
+        
+        # Переименование (F2)
+        self.parent.bind("<F2>", lambda e: self.on_rename_part())
     
     def on_load_body_to_editor(self):
         """Загружает выбранный тип тела в редактор для просмотра/редактирования."""
