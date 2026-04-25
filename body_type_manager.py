@@ -70,6 +70,11 @@ class BodyTypeManager:
         # База данных частей тела
         self.parts_db = PartsDatabase()
         
+        # Состояние видимости панели списка частей
+        self.parts_list_visible = False
+        self.parts_list_frame = None
+        self.parts_list_tree = None
+        
         # Загружаем доступные модули и тела
         self._reload_available_bodies()
     
@@ -125,6 +130,10 @@ class BodyTypeManager:
         ttk.Button(parts_frame, text="🌱 Child", command=self.on_add_child_part, width=8).pack(side=tk.LEFT, padx=2)
         ttk.Button(parts_frame, text="✏️ Rename", command=self.on_rename_part, width=8).pack(side=tk.LEFT, padx=2)
         ttk.Button(parts_frame, text="🗑️ Delete", command=self.on_delete_part, width=8).pack(side=tk.LEFT, padx=2)
+        
+        # Кнопка показа/скрытия списка частей
+        self.toggle_parts_list_btn = ttk.Button(parts_frame, text="📋 List", command=self.toggle_parts_list, width=8)
+        self.toggle_parts_list_btn.pack(side=tk.LEFT, padx=2)
         
         # Группа: База данных
         db_frame = ttk.LabelFrame(top_bar, text="Database", padding=2)
@@ -297,7 +306,7 @@ class BodyTypeManager:
         
         # Кнопка назад
         back_btn = ttk.Button(main_frame, text="Back to Start", command=self.show_start_screen)
-        back_btn.pack(pady=5)
+        back_btn.grid(row=2, column=0, pady=5, sticky="ew")
         
         return main_frame
     
@@ -305,6 +314,147 @@ class BodyTypeManager:
         """Возвращает к начальному экрану (делегирование родительскому окну)."""
         if hasattr(self.parent, 'show_start_screen'):
             self.parent.show_start_screen()
+    
+    def toggle_parts_list(self):
+        """Показывает или скрывает панель списка частей тела."""
+        if self.parts_list_visible:
+            self.hide_parts_list()
+        else:
+            self.show_parts_list()
+    
+    def show_parts_list(self):
+        """Создает и показывает панель списка частей тела."""
+        if self.parts_list_frame is not None:
+            self.parts_list_frame.grid_remove()
+            self.parts_list_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 5))
+            self.parts_list_visible = True
+            self.toggle_parts_list_btn.config(text="📋 Hide List")
+            return
+        
+        # Получаем текущий контейнер дерева
+        tree_container = self.body_parts_tree.master
+        
+        # Создаем новую панель для списка частей
+        self.parts_list_frame = ttk.LabelFrame(tree_container.master, text="All Body Parts (Multiple Roots)", padding=5)
+        self.parts_list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        self.parts_list_frame.grid_columnconfigure(0, weight=1)
+        self.parts_list_frame.grid_rowconfigure(0, weight=1)
+        
+        # Скрываем оригинальный контейнер дерева
+        tree_container.grid_remove()
+        
+        # Дерево со всеми частями (поддержка нескольких корневых узлов)
+        columns = ("tags", "path")
+        self.parts_list_tree = ttk.Treeview(self.parts_list_frame, columns=columns, show="tree headings", selectmode="extended")
+        self.parts_list_tree.heading("#0", text="Bodypart")
+        self.parts_list_tree.column("#0", width=200, minwidth=150)
+        self.parts_list_tree.heading("tags", text="Tags")
+        self.parts_list_tree.column("tags", width=150, minwidth=100)
+        self.parts_list_tree.heading("path", text="Full Path")
+        self.parts_list_tree.column("path", width=300, minwidth=200)
+        
+        # Вертикальный скроллбар
+        vsb = ttk.Scrollbar(self.parts_list_frame, orient="vertical", command=self.parts_list_tree.yview)
+        vsb.grid(row=0, column=1, sticky="ns")
+        
+        # Горизонтальный скроллбар
+        hsb = ttk.Scrollbar(self.parts_list_frame, orient="horizontal", command=self.parts_list_tree.xview)
+        hsb.grid(row=1, column=0, sticky="ew")
+        
+        self.parts_list_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        self.parts_list_tree.grid(row=0, column=0, sticky="nsew")
+        
+        # Заполняем дерево всеми частями
+        self.update_parts_list_tree()
+        
+        # Двойной клик для редактирования
+        self.parts_list_tree.bind("<Double-1>", self.on_parts_list_double_click)
+        
+        self.parts_list_visible = True
+        self.toggle_parts_list_btn.config(text="📋 Hide List")
+    
+    def hide_parts_list(self):
+        """Скрывает панель списка частей тела и показывает основное дерево."""
+        if self.parts_list_frame is not None:
+            self.parts_list_frame.grid_remove()
+        
+        # Показываем оригинальное дерево
+        tree_container = self.body_parts_tree.master
+        tree_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        
+        self.parts_list_visible = False
+        self.toggle_parts_list_btn.config(text="📋 List")
+    
+    def update_parts_list_tree(self):
+        """Обновляет дерево списка всех частей с поддержкой нескольких корней."""
+        if self.parts_list_tree is None:
+            return
+        
+        # Очищаем дерево
+        for item in self.parts_list_tree.get_children():
+            self.parts_list_tree.delete(item)
+        
+        # Рекурсивно добавляем узлы с полным путем
+        def add_children(parent_node_id, parent_key, current_path, visited=None):
+            if visited is None:
+                visited = set()
+            
+            # Защита от циклических ссылок
+            if parent_key in visited:
+                return
+            visited.add(parent_key)
+            
+            children = self.current_body_structure.get(parent_key, [])
+            for child in children:
+                child_name = child["name"] if isinstance(child, dict) else child
+                child_tags = child.get("tags", []) if isinstance(child, dict) else []
+                
+                # Формируем полный путь
+                if current_path:
+                    full_path = f"{current_path} > {child_name}"
+                else:
+                    full_path = child_name
+                
+                # Формируем текст для отображения с тегами
+                display_text = child_name
+                tags_display = f"[{', '.join(child_tags)}]" if child_tags else ""
+                
+                # Добавляем узел в дерево
+                node_id = self.parts_list_tree.insert(parent_node_id, "end", text=display_text, values=(tags_display, full_path))
+                
+                # Рекурсивно добавляем детей
+                add_children(node_id, child_name, full_path, visited.copy())
+        
+        # Начинаем с корневых элементов (ключ None) - поддержка нескольких корней
+        root_parts = self.current_body_structure.get(None, [])
+        for part in root_parts:
+            part_name = part["name"] if isinstance(part, dict) else part
+            part_tags = part.get("tags", []) if isinstance(part, dict) else []
+            
+            display_text = part_name
+            tags_display = f"[{', '.join(part_tags)}]" if part_tags else ""
+            full_path = part_name
+            
+            node_id = self.parts_list_tree.insert("", "end", text=display_text, values=(tags_display, full_path))
+            self.parts_list_tree.item(node_id, open=True)
+            add_children(node_id, part_name, full_path)
+    
+    def on_parts_list_double_click(self, event):
+        """Обрабатывает двойной клик по списку частей для inline-редактирования."""
+        selection = self.parts_list_tree.selection()
+        if not selection:
+            return
+        
+        item = selection[0]
+        column = self.parts_list_tree.identify_column(event.x)
+        
+        # Определяем, какая колонка была клинута
+        if column == "#0":
+            # Редактирование названия
+            self._start_inline_edit(self.parts_list_tree, item, "name")
+        elif column == "tags":
+            # Редактирование тегов
+            self._start_inline_edit(self.parts_list_tree, item, "tags")
     
     def update_auto_size(self, event=None):
         """Автоматически определяет категорию размера на основе диапазона высоты."""
@@ -390,7 +540,15 @@ class BodyTypeManager:
             self.body_parts_tree.delete(item)
         
         # Рекурсивно добавляем узлы
-        def add_children(parent_node_id, parent_key):
+        def add_children(parent_node_id, parent_key, visited=None):
+            if visited is None:
+                visited = set()
+            
+            # Защита от циклических ссылок
+            if parent_key in visited:
+                return
+            visited.add(parent_key)
+            
             children = self.current_body_structure.get(parent_key, [])
             for child in children:
                 child_name = child["name"] if isinstance(child, dict) else child
@@ -412,7 +570,7 @@ class BodyTypeManager:
                     self.body_parts_tree.item(node_id, open=True)
                 
                 # Рекурсивно добавляем детей этого узла
-                add_children(node_id, child_name)
+                add_children(node_id, child_name, visited.copy())
         
         # Начинаем с корневых элементов (ключ None)
         root_parts = self.current_body_structure.get(None, [])
@@ -760,6 +918,104 @@ class BodyTypeManager:
             tags_entry.bind("<Return>", save_tags)
             tags_entry.bind("<FocusOut>", save_tags)
             tags_entry.bind("<Escape>", lambda e: tags_entry.destroy())
+    
+    def _start_inline_edit(self, tree, item, field_type):
+        """Универсальная функция для inline-редактирования в любом дереве."""
+        if field_type == "name":
+            # Редактирование названия
+            old_name = tree.item(item)["text"]
+            
+            # Нельзя переименовать корневой элемент "Body"
+            if old_name == "Body":
+                messagebox.showwarning("Cannot Rename", "Cannot rename the root 'Body' part.", parent=self.parent)
+                return
+            
+            name_entry = ttk.Entry(tree)
+            name_entry.insert(0, old_name)
+            
+            bbox = tree.bbox(item, "#0")
+            if bbox:
+                x, y, width, height = bbox
+                name_entry.place(x=x, y=y, width=width, height=height)
+                name_entry.focus()
+                name_entry.select_range(0, tk.END)
+                
+                def confirm(event=None):
+                    new_name = name_entry.get().strip()
+                    if not new_name:
+                        messagebox.showwarning("Invalid Input", "Name cannot be empty.", parent=self.parent)
+                        name_entry.focus()
+                        return
+                    
+                    if new_name == old_name:
+                        name_entry.destroy()
+                        return
+                    
+                    # Проверяем на дубликат
+                    for parent, children in self.current_body_structure.items():
+                        for child in children:
+                            child_name = child["name"] if isinstance(child, dict) else child
+                            if child_name == new_name:
+                                messagebox.showwarning("Duplicate", f"A part with name '{new_name}' already exists.", parent=self.parent)
+                                name_entry.focus()
+                                return
+                    
+                    # Переименовываем во всех местах
+                    for parent, children in self.current_body_structure.items():
+                        for i, child in enumerate(children):
+                            if isinstance(child, dict) and child.get("name") == old_name:
+                                children[i]["name"] = new_name
+                            elif child == old_name:
+                                children[i] = new_name
+                    
+                    # Ключ структуры (если есть)
+                    if old_name in self.current_body_structure:
+                        self.current_body_structure[new_name] = self.current_body_structure.pop(old_name)
+                    
+                    # Сохраняем состояние для Undo
+                    self._save_action_state("rename", {"old_name": old_name, "new_name": new_name})
+                    
+                    self.update_body_parts_tree()
+                    if self.parts_list_visible:
+                        self.update_parts_list_tree()
+                    name_entry.destroy()
+                
+                name_entry.bind("<Return>", confirm)
+                name_entry.bind("<FocusOut>", confirm)
+                name_entry.bind("<Escape>", lambda e: name_entry.destroy())
+        
+        elif field_type == "tags":
+            # Редактирование тегов
+            current_tags_str = tree.item(item)["values"][0] if tree.item(item)["values"] else ""
+            current_tags = [t.strip() for t in current_tags_str.strip("[]").split(",") if t.strip()] if current_tags_str else []
+            
+            tags_entry = ttk.Entry(tree)
+            tags_entry.insert(0, ", ".join(current_tags))
+            
+            bbox = tree.bbox(item, "tags")
+            if bbox:
+                x, y, width, height = bbox
+                tags_entry.place(x=x, y=y, width=width, height=height)
+                tags_entry.focus()
+                tags_entry.select_range(0, tk.END)
+                
+                def save_tags(event=None):
+                    new_tags_str = tags_entry.get().strip()
+                    new_tags = [t.strip() for t in new_tags_str.split(",") if t.strip()] if new_tags_str else []
+                    
+                    # Обновляем структуру
+                    part_name = tree.item(item)["text"].split(" [")[0]
+                    self._update_part_tags(part_name, new_tags)
+                    
+                    # Обновляем деревья
+                    self.update_body_parts_tree()
+                    if self.parts_list_visible:
+                        self.update_parts_list_tree()
+                    tags_entry.destroy()
+                
+                tags_entry.bind("<Return>", save_tags)
+                tags_entry.bind("<FocusOut>", save_tags)
+                tags_entry.bind("<Escape>", lambda e: tags_entry.destroy())
     
     def _update_part_tags(self, part_name, new_tags):
         """Обновляет теги указанной части в структуре."""
