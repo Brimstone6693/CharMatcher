@@ -82,139 +82,82 @@ class BodyTypeManager:
         for widget in self.parent.winfo_children():
             widget.destroy()
         
-        # Настраиваем основное окно с прокруткой
+        # Устанавливаем заголовок окна
+        self.parent.title("Body Master")
+        
+        # Основной контейнер с grid layout для лучшего контроля
         main_frame = ttk.Frame(self.parent)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.grid_rowconfigure(1, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
         
-        # Создаем Canvas для прокрутки
-        canvas = tk.Canvas(main_frame)
-        scrollbar_y = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
+        # --- Top Bar (Профессиональная панель инструментов) ---
+        top_bar = ttk.Frame(main_frame)
+        top_bar.grid(row=0, column=0, sticky="ew", pady=(0, 5))
         
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
+        # Группа: История
+        history_frame = ttk.LabelFrame(top_bar, text="History", padding=2)
+        history_frame.pack(side=tk.LEFT, padx=(0, 10))
         
-        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar_y.set)
+        self.undo_btn = ttk.Button(history_frame, text="↶ Undo", command=self.on_undo, width=8)
+        self.undo_btn.pack(side=tk.LEFT, padx=2)
         
-        # Привязка изменения размера окна для обновления ширины canvas
-        def on_canvas_configure(event):
-            canvas.itemconfig(canvas_window, width=event.width)
+        self.redo_btn = ttk.Button(history_frame, text="↷ Redo", command=self.on_redo, width=8)
+        self.redo_btn.pack(side=tk.LEFT, padx=2)
         
-        canvas.bind("<Configure>", on_canvas_configure)
+        # Группа: Файл
+        file_frame = ttk.LabelFrame(top_bar, text="File", padding=2)
+        file_frame.pack(side=tk.LEFT, padx=5)
         
-        # Привязка колесика мыши для прокрутки
-        def on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        ttk.Button(file_frame, text="📂 New", command=self.on_new_body, width=8).pack(side=tk.LEFT, padx=2)
+        ttk.Button(file_frame, text="💾 Save", command=self.on_save_body, width=8).pack(side=tk.LEFT, padx=2)
+        ttk.Button(file_frame, text="📁 Open", command=self.on_load_body_to_editor, width=8).pack(side=tk.LEFT, padx=2)
         
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar_y.pack(side="right", fill="y")
+        # Группа: Части тела
+        parts_frame = ttk.LabelFrame(top_bar, text="Parts", padding=2)
+        parts_frame.pack(side=tk.LEFT, padx=10)
         
-        frame = scrollable_frame
+        ttk.Button(parts_frame, text="➕ Root", command=self.on_add_root_part, width=8).pack(side=tk.LEFT, padx=2)
+        ttk.Button(parts_frame, text="🌱 Child", command=self.on_add_child_part, width=8).pack(side=tk.LEFT, padx=2)
+        ttk.Button(parts_frame, text="✏️ Rename", command=self.on_rename_part, width=8).pack(side=tk.LEFT, padx=2)
+        ttk.Button(parts_frame, text="🗑️ Delete", command=self.on_delete_part, width=8).pack(side=tk.LEFT, padx=2)
         
-        # Создаем топ бар с основными функциями
-        top_bar = ttk.Frame(frame)
-        top_bar.pack(fill=tk.X, pady=(0, 10))
+        # Кнопка назад справа
+        ttk.Button(top_bar, text="← Back", command=self.show_start_screen).pack(side=tk.RIGHT, padx=5)
         
-        ttk.Label(top_bar, text="Manage Body Types", font=("Arial", 14, "bold")).pack(side=tk.LEFT, padx=(0, 20))
+        # --- Основная рабочая область ---
+        workspace = ttk.Frame(main_frame)
+        workspace.grid(row=1, column=0, sticky="nsew")
+        workspace.grid_columnconfigure(0, weight=1)  # Дерево растягивается
+        workspace.grid_columnconfigure(1, weight=0)  # Панель свойств фиксирована
+        workspace.grid_rowconfigure(0, weight=1)
         
-        undo_btn = ttk.Button(top_bar, text="Undo (Ctrl+Z)", command=self.on_undo)
-        undo_btn.pack(side=tk.LEFT, padx=5)
+        # Левая часть: Дерево частей тела
+        tree_container = ttk.LabelFrame(workspace, text="Body Parts Structure", padding=5)
+        tree_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        tree_container.grid_columnconfigure(0, weight=1)
+        tree_container.grid_rowconfigure(0, weight=1)
         
-        redo_btn = ttk.Button(top_bar, text="Redo (Ctrl+Y)", command=self.on_redo)
-        redo_btn.pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(frame, text="Add New Body Type", font=("Arial", 12, "bold")).pack(pady=(10, 5))
-        
-        # Форма добавления нового типа тела
-        form_frame = ttk.LabelFrame(frame, text="Add New Body Type")
-        form_frame.pack(fill=tk.X, pady=10, padx=10)
-        
-        # Имя класса
-        ttk.Label(form_frame, text="Class Name (e.g., Insectoid):").grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.new_body_class_name_entry = ttk.Entry(form_frame)
-        self.new_body_class_name_entry.grid(row=0, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
-        ttk.Label(form_frame, text="('Body' will be added automatically)").grid(row=0, column=2, sticky=tk.W, pady=5, padx=(5, 0))
-        
-        # Отображаемое имя
-        ttk.Label(form_frame, text="Display Name (e.g., Insectoid):").grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.new_body_display_name_entry = ttk.Entry(form_frame)
-        self.new_body_display_name_entry.grid(row=1, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
-        
-        # Размер - диапазон высоты/роста
-        size_frame = ttk.LabelFrame(form_frame, text="Size Range")
-        size_frame.grid(row=2, column=0, columnspan=3, sticky=tk.EW, pady=5)
-        
-        # Переключатель типа измерения
-        self.height_type_var = tk.StringVar(value="standing")
-        height_type_frame = ttk.Frame(size_frame)
-        height_type_frame.grid(row=0, column=0, columnspan=4, sticky=tk.W, pady=5)
-        
-        ttk.Radiobutton(height_type_frame, text="Standing Height", variable=self.height_type_var, value="standing").pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Radiobutton(height_type_frame, text="Withers Height", variable=self.height_type_var, value="withers").pack(side=tk.LEFT)
-        
-        # Привязка события для обновления размера при переключении типа высоты
-        self.height_type_var.trace_add('write', lambda *args: self.update_auto_size())
-        
-        # Поля ввода диапазона
-        ttk.Label(size_frame, text="Min (cm):").grid(row=1, column=0, sticky=tk.W, pady=5, padx=(5, 0))
-        self.new_body_height_min_entry = ttk.Entry(size_frame, width=10)
-        self.new_body_height_min_entry.grid(row=1, column=1, sticky=tk.W, pady=5, padx=(0, 15))
-        self.new_body_height_min_entry.insert(0, "150")
-        
-        ttk.Label(size_frame, text="Max (cm):").grid(row=1, column=2, sticky=tk.W, pady=5, padx=(5, 0))
-        self.new_body_height_max_entry = ttk.Entry(size_frame, width=10)
-        self.new_body_height_max_entry.grid(row=1, column=3, sticky=tk.W, pady=5)
-        self.new_body_height_max_entry.insert(0, "200")
-        
-        # Автоматическое описание размера (только для чтения)
-        ttk.Label(size_frame, text="Auto Size Category:").grid(row=2, column=0, sticky=tk.W, pady=5, padx=(5, 0))
-        self.auto_size_label = ttk.Label(size_frame, text="Medium", font=("Arial", 10, "bold"))
-        self.auto_size_label.grid(row=2, column=1, sticky=tk.W, pady=5, padx=(0, 15), columnspan=2)
-        
-        # Привязка событий для авто-обновления размера
-        self.new_body_height_min_entry.bind('<KeyRelease>', self.update_auto_size)
-        self.new_body_height_max_entry.bind('<KeyRelease>', self.update_auto_size)
-        
-        # Пол - выпадающий список + custom поле
-        gender_frame = ttk.Frame(form_frame)
-        gender_frame.grid(row=3, column=0, columnspan=3, sticky=tk.EW, pady=5)
-        
-        ttk.Label(gender_frame, text="Gender:").pack(side=tk.LEFT, padx=(0, 10))
-        self.new_body_gender_var = tk.StringVar(value="N/A")
-        gender_combo = ttk.Combobox(gender_frame, textvariable=self.new_body_gender_var, 
-                                    values=["Male", "Female", "Herm", "N/A", "Other"], state="readonly", width=12)
-        gender_combo.pack(side=tk.LEFT, padx=(0, 10))
-        
-        ttk.Label(gender_frame, text="Custom (optional):").pack(side=tk.LEFT, padx=(10, 5))
-        self.new_body_gender_custom_entry = ttk.Entry(gender_frame, width=20)
-        self.new_body_gender_custom_entry.pack(side=tk.LEFT)
-        
-        # Части тела (интерактивное дерево)
-        ttk.Label(form_frame, text="Body Parts Hierarchy:").grid(row=4, column=0, sticky=tk.W, pady=5)
-        
-        # Фрейм для дерева и кнопок
-        tree_frame = ttk.Frame(form_frame)
-        tree_frame.grid(row=5, column=1, sticky=tk.EW, pady=5, padx=(10, 0), rowspan=3)
-        
-        # Дерево для отображения иерархии с поддержкой множественного выбора
+        # Дерево с вертикальным и горизонтальным скроллбарами
         columns = ("tags",)
-        self.body_parts_tree = ttk.Treeview(tree_frame, columns=columns, show="tree headings", height=8, selectmode="extended")
+        self.body_parts_tree = ttk.Treeview(tree_container, columns=columns, show="tree headings", selectmode="extended")
         self.body_parts_tree.heading("#0", text="Bodypart")
-        self.body_parts_tree.column("#0", width=200)
+        self.body_parts_tree.column("#0", width=200, minwidth=150)
         self.body_parts_tree.heading("tags", text="Tags")
-        self.body_parts_tree.column("tags", width=150)
+        self.body_parts_tree.column("tags", width=150, minwidth=100)
         
-        scrollbar_tree = ttk.Scrollbar(tree_frame, orient="vertical", command=self.body_parts_tree.yview)
-        self.body_parts_tree.configure(yscrollcommand=scrollbar_tree.set)
+        # Вертикальный скроллбар
+        vsb = ttk.Scrollbar(tree_container, orient="vertical", command=self.body_parts_tree.yview)
+        vsb.grid(row=0, column=1, sticky="ns")
         
-        self.body_parts_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar_tree.pack(side=tk.RIGHT, fill=tk.Y)
+        # Горизонтальный скроллбар
+        hsb = ttk.Scrollbar(tree_container, orient="horizontal", command=self.body_parts_tree.xview)
+        hsb.grid(row=1, column=0, sticky="ew")
         
-        # Контекстное меню для дерева частей тела
+        self.body_parts_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        self.body_parts_tree.grid(row=0, column=0, sticky="nsew")
+        
+        # Контекстное меню для дерева
         self.tree_menu = tk.Menu(self.parent, tearoff=0)
         self.tree_menu.add_command(label="Copy", command=self.on_copy_parts)
         self.tree_menu.add_command(label="Paste", command=self.on_paste_parts)
@@ -223,31 +166,106 @@ class BodyTypeManager:
         self.tree_menu.add_command(label="Rename Part", command=self.on_rename_part)
         self.tree_menu.add_command(label="Delete Part", command=self.on_delete_part)
         self.tree_menu.add_separator()
-        self.tree_menu.add_command(label="Undo (Ctrl+Z)", command=self.on_undo)
-        self.tree_menu.add_command(label="Redo (Ctrl+Y)", command=self.on_redo)
+        self.tree_menu.add_command(label="Undo", command=self.on_undo)
+        self.tree_menu.add_command(label="Redo", command=self.on_redo)
         
-        # Привязка контекстного меню и горячих клавиш к дереву
         self.body_parts_tree.bind("<Button-3>", self.on_tree_right_click)
-        self.body_parts_tree.bind("<Control-c>", lambda e: self.on_copy_parts())
-        self.body_parts_tree.bind("<Control-v>", lambda e: self.on_paste_parts())
-        self.body_parts_tree.bind("<Delete>", lambda e: self.on_delete_part())
-        self.body_parts_tree.bind("<F2>", lambda e: self.on_rename_part())
-        self.body_parts_tree.bind("<Control-z>", lambda e: self.on_undo())
-        self.body_parts_tree.bind("<Control-y>", lambda e: self.on_redo())
+        self.body_parts_tree.bind("<Double-1>", lambda e: self.on_rename_part())
         
-        # Легенда убрана - она мешала и была избыточна
+        # Правая панель: Свойства и список тел
+        right_panel = ttk.Frame(workspace)
+        right_panel.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        right_panel.grid_rowconfigure(1, weight=1)
+        right_panel.grid_columnconfigure(0, weight=1)
         
-        # Кнопки управления деревом
-        btn_frame = ttk.Frame(form_frame)
-        btn_frame.grid(row=8, column=1, sticky=tk.W, pady=5, padx=(10, 0))
+        # Форма свойств тела
+        props_frame = ttk.LabelFrame(right_panel, text="Body Type Properties", padding=10)
+        props_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        props_frame.grid_columnconfigure(1, weight=1)
         
-        add_root_btn = ttk.Button(btn_frame, text="Add Root Part", command=self.on_add_root_part)
-        add_root_btn.pack(side=tk.LEFT, padx=(0, 5))
+        # Имя класса
+        ttk.Label(props_frame, text="Class Name:").grid(row=0, column=0, sticky=tk.W, pady=3)
+        self.new_body_class_name_entry = ttk.Entry(props_frame)
+        self.new_body_class_name_entry.grid(row=0, column=1, sticky="ew", pady=3)
         
-        add_child_btn = ttk.Button(btn_frame, text="Add Child Part", command=self.on_add_child_part)
-        add_child_btn.pack(side=tk.LEFT, padx=(0, 5))
+        # Отображаемое имя
+        ttk.Label(props_frame, text="Display Name:").grid(row=1, column=0, sticky=tk.W, pady=3)
+        self.new_body_display_name_entry = ttk.Entry(props_frame)
+        self.new_body_display_name_entry.grid(row=1, column=1, sticky="ew", pady=3)
         
-        delete_part_btn = ttk.Button(btn_frame, text="Delete Part", command=self.on_delete_part)
+        # Тип высоты
+        ttk.Label(props_frame, text="Height Type:").grid(row=2, column=0, sticky=tk.W, pady=3)
+        self.height_type_var = tk.StringVar(value="standing")
+        height_combo = ttk.Combobox(props_frame, textvariable=self.height_type_var, 
+                                    values=["standing", "withers"], state="readonly")
+        height_combo.grid(row=2, column=1, sticky="ew", pady=3)
+        self.height_type_var.trace_add('write', lambda *args: self.update_auto_size())
+        
+        # Диапазон высоты
+        size_frame = ttk.Frame(props_frame)
+        size_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=3)
+        
+        ttk.Label(size_frame, text="Min (cm):").pack(side=tk.LEFT, padx=(0, 5))
+        self.new_body_height_min_entry = ttk.Entry(size_frame, width=8)
+        self.new_body_height_min_entry.pack(side=tk.LEFT, padx=(0, 15))
+        self.new_body_height_min_entry.insert(0, "150")
+        self.new_body_height_min_entry.bind('<KeyRelease>', self.update_auto_size)
+        
+        ttk.Label(size_frame, text="Max (cm):").pack(side=tk.LEFT, padx=(0, 5))
+        self.new_body_height_max_entry = ttk.Entry(size_frame, width=8)
+        self.new_body_height_max_entry.pack(side=tk.LEFT)
+        self.new_body_height_max_entry.insert(0, "200")
+        self.new_body_height_max_entry.bind('<KeyRelease>', self.update_auto_size)
+        
+        # Авто-размер
+        ttk.Label(props_frame, text="Auto Size:").grid(row=4, column=0, sticky=tk.W, pady=3)
+        self.auto_size_label = ttk.Label(props_frame, text="Medium", font=("Arial", 10, "bold"), foreground="blue")
+        self.auto_size_label.grid(row=4, column=1, sticky=tk.W, pady=3)
+        
+        # Пол
+        gender_frame = ttk.Frame(props_frame)
+        gender_frame.grid(row=5, column=0, columnspan=2, sticky="ew", pady=3)
+        
+        ttk.Label(gender_frame, text="Gender:").pack(side=tk.LEFT, padx=(0, 5))
+        self.new_body_gender_var = tk.StringVar(value="N/A")
+        gender_combo = ttk.Combobox(gender_frame, textvariable=self.new_body_gender_var, 
+                                    values=["Male", "Female", "Herm", "N/A", "Other"], state="readonly", width=10)
+        gender_combo.pack(side=tk.LEFT, padx=(0, 5))
+        
+        ttk.Label(gender_frame, text="Custom:").pack(side=tk.LEFT, padx=(5, 2))
+        self.new_body_gender_custom_entry = ttk.Entry(gender_frame, width=15)
+        self.new_body_gender_custom_entry.pack(side=tk.LEFT)
+        
+        # Список сохраненных тел
+        list_frame = ttk.LabelFrame(right_panel, text="Saved Body Types", padding=5)
+        list_frame.grid(row=1, column=0, sticky="nsew")
+        list_frame.grid_columnconfigure(0, weight=1)
+        list_frame.grid_rowconfigure(0, weight=1)
+        
+        self.bodies_listbox = tk.Listbox(list_frame, selectmode=tk.SINGLE)
+        self.bodies_listbox.grid(row=0, column=0, sticky="nsew")
+        
+        list_scroll = ttk.Scrollbar(list_frame, orient="vertical", command=self.bodies_listbox.yview)
+        list_scroll.grid(row=0, column=1, sticky="ns")
+        self.bodies_listbox.config(yscrollcommand=list_scroll.set)
+        
+        self.bodies_listbox.bind("<<ListboxSelect>>", self.on_body_selected)
+        self.bodies_listbox.bind("<Double-Button-1>", lambda e: self.on_load_body_to_editor())
+        
+        # Кнопки списка
+        list_btn_frame = ttk.Frame(list_frame)
+        list_btn_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(5, 0))
+        ttk.Button(list_btn_frame, text="Load", command=self.on_load_body_to_editor).pack(side=tk.LEFT, padx=2)
+        ttk.Button(list_btn_frame, text="Delete", command=self.on_delete_body_type).pack(side=tk.LEFT, padx=2)
+        
+        # Привязка горячих клавиш
+        self._bind_shortcuts()
+        
+        # Загрузка списка тел
+        self.refresh_bodies_list()
+        
+        # Инициализация авто-размера
+        self.update_auto_size()
         delete_part_btn.pack(side=tk.LEFT, padx=(0, 5))
         
         rename_part_btn = ttk.Button(btn_frame, text="Rename Part", command=self.on_rename_part)
@@ -858,6 +876,10 @@ class BodyTypeManager:
             self.current_body_structure = {None: []}
             self.update_body_parts_tree()
             
+            # Очищаем историю действий после создания нового тела
+            self.action_history.clear()
+            self.redo_stack.clear()
+            
             messagebox.showinfo("Success", f"Successfully created new body type '{class_name}'!\nIt is now available for selection.")
             
         except Exception as e:
@@ -1039,6 +1061,10 @@ class BodyTypeManager:
             
             self.current_body_structure = body_structure
             self.update_body_parts_tree()
+            
+            # Очищаем историю действий при загрузке нового тела
+            self.action_history.clear()
+            self.redo_stack.clear()
             
             # Загружаем шаблон описания
             desc_template = data.get('description_template', '')
