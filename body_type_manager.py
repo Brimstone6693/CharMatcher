@@ -197,6 +197,11 @@ class BodyTypeManager:
         self.tree_menu.add_command(label="Copy", command=self.on_copy_parts)
         self.tree_menu.add_command(label="Paste", command=self.on_paste_parts)
         self.tree_menu.add_separator()
+        
+        # Подменю для добавления тегов
+        self.add_tag_menu = tk.Menu(self.tree_menu, tearoff=0)
+        self.tree_menu.add_cascade(label="Add Tag", menu=self.add_tag_menu)
+        
         self.tree_menu.add_command(label="Add Child Part", command=self.on_add_child_part)
         self.tree_menu.add_command(label="Rename Part", command=self.on_rename_part)
         self.tree_menu.add_command(label="Delete Part", command=self.on_delete_part)
@@ -787,7 +792,7 @@ class BodyTypeManager:
 
     
     def update_parts_list_tree(self):
-        """Обновляет дерево списка всех частей с поддержкой нескольких корней."""
+        """Обновляет дерево списка всех сохранённых частей из базы данных."""
         if self.parts_list_tree is None:
             return
         
@@ -795,67 +800,104 @@ class BodyTypeManager:
         for item in self.parts_list_tree.get_children():
             self.parts_list_tree.delete(item)
         
-        # Рекурсивно добавляем узлы с полным путем
-        def add_children(parent_node_id, parent_key, current_path, visited=None):
-            if visited is None:
-                visited = set()
-            
-            # Защита от циклических ссылок
-            if parent_key in visited:
-                return
-            visited.add(parent_key)
-            
-            children = self.current_body_structure.get(parent_key, [])
-            for child in children:
-                child_name = child["name"] if isinstance(child, dict) else child
-                child_tags = child.get("tags", []) if isinstance(child, dict) else []
-                
-                # Формируем полный путь
-                if current_path:
-                    full_path = f"{current_path} > {child_name}"
-                else:
-                    full_path = child_name
-                
-                # Формируем текст для отображения с тегами
-                display_text = child_name
-                tags_display = f"[{', '.join(child_tags)}]" if child_tags else ""
-                
-                # Добавляем узел в дерево
-                node_id = self.parts_list_tree.insert(parent_node_id, "end", text=display_text, values=(tags_display, full_path))
-                
-                # Рекурсивно добавляем детей
-                add_children(node_id, child_name, full_path, visited.copy())
+        # Получаем все сохранённые части из базы данных
+        all_parts = self.parts_db.get_individual_parts()
         
-        # Начинаем с корневых элементов (ключ None) - поддержка нескольких корней
-        root_parts = self.current_body_structure.get(None, [])
-        for part in root_parts:
-            part_name = part["name"] if isinstance(part, dict) else part
-            part_tags = part.get("tags", []) if isinstance(part, dict) else []
+        # Добавляем каждую часть как корневой элемент
+        for part in all_parts:
+            part_name = part.get("name", "Unknown")
+            part_tags = part.get("tags", [])
+            part_description = part.get("description", "")
+            part_size_min = part.get("size_min", 0.0)
+            part_size_max = part.get("size_max", 0.0)
             
+            # Формируем текст для отображения с тегами
             display_text = part_name
             tags_display = f"[{', '.join(part_tags)}]" if part_tags else ""
-            full_path = part_name
             
+            # Формируем полный путь (для базы данных это просто имя + описание)
+            full_path = part_name
+            if part_description:
+                full_path += f" - {part_description}"
+            if part_size_min > 0 or part_size_max > 0:
+                full_path += f" ({part_size_min}-{part_size_max}cm)"
+            
+            # Добавляем узел в дерево
             node_id = self.parts_list_tree.insert("", "end", text=display_text, values=(tags_display, full_path))
             self.parts_list_tree.item(node_id, open=True)
-            add_children(node_id, part_name, full_path)
     
     def on_parts_list_double_click(self, event):
-        """Обрабатывает двойной клик по списку частей для inline-редактирования."""
+        """Обрабатывает двойной клик по списку частей для загрузки части в текущее тело."""
         selection = self.parts_list_tree.selection()
         if not selection:
             return
         
         item = selection[0]
-        column = self.parts_list_tree.identify_column(event.x)
+        part_name = self.parts_list_tree.item(item, "text")
         
-        # Определяем, какая колонка была клинута
-        if column == "#0":
-            # Редактирование названия
-            self._start_inline_edit(self.parts_list_tree, item, "name")
-        elif column == "tags":
-            # Редактирование тегов
-            self._start_inline_edit(self.parts_list_tree, item, "tags")
+        # Получаем данные части из базы
+        parts = self.parts_db.get_individual_parts()
+        part_data = next((p for p in parts if p["name"] == part_name), None)
+        
+        if not part_data:
+            messagebox.showerror("Error", "Part not found in database.", parent=self.parent)
+            return
+        
+        # Спрашиваем у пользователя, куда добавить часть
+        dialog = tk.Toplevel(self.parent)
+        dialog.title("Add Part to Body")
+        dialog.geometry("400x200")
+        dialog.transient(self.parent)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Select parent part in the main tree first,\nthen click 'Add' to add this part as a child.").pack(pady=10)
+        
+        def add_to_selected():
+            tree_selection = self.body_parts_tree.selection()
+            if not tree_selection:
+                messagebox.showwarning("No Selection", "Please select a parent part in the main tree.", parent=dialog)
+                return
+            
+            parent_item = tree_selection[0]
+            parent_name = self.body_parts_tree.item(parent_item, "text")
+            
+            # Проверяем на дубликат имени у родителя и добавляем суффикс если нужно
+            existing_names = set()
+            for existing in self.current_body_structure.get(parent_name, []):
+                existing_name = existing["name"] if isinstance(existing, dict) else existing
+                existing_names.add(existing_name)
+            
+            base_name = part_data["name"]
+            counter = 1
+            new_name = part_data["name"]
+            while new_name in existing_names:
+                new_name = f"{base_name}_{counter}"
+                counter += 1
+            
+            # Добавляем часть к родителю с уникальным именем
+            if parent_name not in self.current_body_structure:
+                self.current_body_structure[parent_name] = []
+            
+            self.current_body_structure[parent_name].append({
+                "name": new_name,
+                "tags": part_data.get("tags", [])
+            })
+            
+            # Сохраняем состояние для Undo
+            self._save_action_state("add_child", {
+                "name": new_name,
+                "tags": part_data.get("tags", []),
+                "parent": parent_name
+            })
+            
+            self.update_body_parts_tree()
+            messagebox.showinfo("Success", f"Part '{part_name}' added to '{parent_name}'!", parent=dialog)
+            dialog.destroy()
+        
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(pady=10)
+        ttk.Button(btn_frame, text="Add to Selected", command=add_to_selected).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
     
     def update_auto_size(self, event=None):
         """Автоматически определяет категорию размера на основе диапазона высоты."""
@@ -2068,11 +2110,96 @@ class BodyTypeManager:
         if item:
             self.body_parts_tree.selection_set(item)
         
+        # Обновляем меню тегов перед показом
+        self._update_add_tag_menu()
+        
         # Показываем контекстное меню
         try:
             self.tree_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self.tree_menu.grab_release()
+    
+    def _update_add_tag_menu(self):
+        """Обновляет подменю добавления тегов из общего пула."""
+        # Очищаем текущее меню
+        self.add_tag_menu.delete(0, tk.END)
+        
+        # Получаем все теги из базы данных
+        all_tags = self.parts_db.get_all_tags()
+        
+        if not all_tags:
+            self.add_tag_menu.add_command(label="No tags available", state=tk.DISABLED)
+            self.add_tag_menu.add_separator()
+        
+        # Сортируем теги по категориям
+        tags_by_category = {}
+        for tag in all_tags:
+            category = tag.get("category", "General")
+            if category not in tags_by_category:
+                tags_by_category[category] = []
+            tags_by_category[category].append(tag)
+        
+        # Добавляем теги по категориям
+        for category in sorted(tags_by_category.keys()):
+            tags = tags_by_category[category]
+            if len(tags) > 1:
+                # Создаем подменю для категории
+                cat_menu = tk.Menu(self.add_tag_menu, tearoff=0)
+                for tag in tags:
+                    cat_menu.add_command(label=tag["name"], command=lambda t=tag["name"]: self._apply_tag_to_selected_part(t))
+                self.add_tag_menu.add_cascade(label=category, menu=cat_menu)
+            else:
+                # Если только один тег в категории, добавляем напрямую
+                for tag in tags:
+                    self.add_tag_menu.add_command(label=f"{tag['name']} ({category})", command=lambda t=tag["name"]: self._apply_tag_to_selected_part(t))
+        
+        self.add_tag_menu.add_separator()
+        # Добавляем опцию Custom для создания нового тега
+        self.add_tag_menu.add_command(label="Custom...", command=self.on_add_custom_tag)
+    
+    def on_add_custom_tag(self):
+        """Открывает диалог для создания нового тега и применения его к выбранной части."""
+        dialog = tk.Toplevel(self.parent)
+        dialog.title("Add Custom Tag")
+        dialog.geometry("400x250")
+        dialog.transient(self.parent)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Tag Name:").pack(pady=5)
+        tag_name_entry = ttk.Entry(dialog, width=40)
+        tag_name_entry.pack(pady=5)
+        tag_name_entry.focus()
+        
+        ttk.Label(dialog, text="Category (optional):").pack(pady=5)
+        category_entry = ttk.Entry(dialog, width=40)
+        category_entry.pack(pady=5)
+        category_entry.insert(0, "General")
+        
+        ttk.Label(dialog, text="Description (optional):").pack(pady=5)
+        desc_entry = ttk.Entry(dialog, width=40)
+        desc_entry.pack(pady=5)
+        
+        add_to_db_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(dialog, text="Add to global tag database", variable=add_to_db_var).pack(pady=10)
+        
+        def save_and_apply():
+            tag_name = tag_name_entry.get().strip()
+            if not tag_name:
+                messagebox.showwarning("Invalid Input", "Tag name cannot be empty.", parent=dialog)
+                return
+            
+            category = category_entry.get().strip() or "General"
+            description = desc_entry.get().strip()
+            
+            # Если чекбокс установлен, добавляем тег в базу данных
+            if add_to_db_var.get():
+                self.parts_db.add_or_update_tag(tag_name, category, description)
+            
+            # Применяем тег к выбранной части
+            self._apply_tag_to_selected_part(tag_name)
+            dialog.destroy()
+        
+        ttk.Button(dialog, text="Apply Tag", command=save_and_apply).pack(pady=10)
     
     def on_body_list_right_click(self, event):
         """Обработчик правого клика по списку типов тел."""
