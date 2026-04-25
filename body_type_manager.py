@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import copy  # Импортируем модуль для глубокого копирования
 from module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
+from parts_database import PartsDatabase
 
 
 class BodyTypeManager:
@@ -66,6 +67,9 @@ class BodyTypeManager:
         self.redo_stack = []
         self.max_history_size = 50
         
+        # База данных частей тела
+        self.parts_db = PartsDatabase()
+        
         # Загружаем доступные модули и тела
         self._reload_available_bodies()
     
@@ -109,8 +113,8 @@ class BodyTypeManager:
         file_frame = ttk.LabelFrame(top_bar, text="File", padding=2)
         file_frame.pack(side=tk.LEFT, padx=5)
         
-        ttk.Button(file_frame, text="📂 New", command=self.on_new_body, width=8).pack(side=tk.LEFT, padx=2)
-        ttk.Button(file_frame, text="💾 Save", command=self.on_save_body, width=8).pack(side=tk.LEFT, padx=2)
+        ttk.Button(file_frame, text="📂 New", command=self.new_body, width=8).pack(side=tk.LEFT, padx=2)
+        ttk.Button(file_frame, text="💾 Save", command=self.save_body, width=8).pack(side=tk.LEFT, padx=2)
         ttk.Button(file_frame, text="📁 Open", command=self.on_load_body_to_editor, width=8).pack(side=tk.LEFT, padx=2)
         
         # Группа: Части тела
@@ -121,6 +125,15 @@ class BodyTypeManager:
         ttk.Button(parts_frame, text="🌱 Child", command=self.on_add_child_part, width=8).pack(side=tk.LEFT, padx=2)
         ttk.Button(parts_frame, text="✏️ Rename", command=self.on_rename_part, width=8).pack(side=tk.LEFT, padx=2)
         ttk.Button(parts_frame, text="🗑️ Delete", command=self.on_delete_part, width=8).pack(side=tk.LEFT, padx=2)
+        
+        # Группа: База данных
+        db_frame = ttk.LabelFrame(top_bar, text="Database", padding=2)
+        db_frame.pack(side=tk.LEFT, padx=10)
+        
+        ttk.Button(db_frame, text="💾 Save Part", command=self.on_save_part_to_db, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Button(db_frame, text="📂 Load Part", command=self.on_load_part_from_db, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Button(db_frame, text="🌳 Save Tree", command=self.on_save_tree_to_db, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Button(db_frame, text="📁 Load Tree", command=self.on_load_tree_from_db, width=10).pack(side=tk.LEFT, padx=2)
         
         # Кнопка назад справа
         ttk.Button(top_bar, text="← Back", command=self.show_start_screen).pack(side=tk.RIGHT, padx=5)
@@ -767,6 +780,343 @@ class BodyTypeManager:
         
         self.update_body_parts_tree()
         messagebox.showinfo("Paste", "Parts pasted successfully.", parent=self.parent)
+    
+    def on_save_part_to_db(self):
+        """Сохраняет выбранную часть тела в базу данных"""
+        selection = self.body_parts_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a part to save.", parent=self.parent)
+            return
+        
+        item = selection[0]
+        part_name = self.body_parts_tree.item(item, "text")
+        tags_str = self.body_parts_tree.item(item, "values")[0] if self.body_parts_tree.item(item, "values") else ""
+        tags = [t.strip() for t in tags_str.strip("[]").split(",") if t.strip()] if tags_str else []
+        
+        # Диалог для сохранения части
+        dialog = tk.Toplevel(self.parent)
+        dialog.title("Save Part to Database")
+        dialog.geometry("400x250")
+        dialog.transient(self.parent)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Part Name:").pack(pady=5)
+        name_entry = ttk.Entry(dialog, width=40)
+        name_entry.insert(0, part_name)
+        name_entry.pack(pady=5)
+        
+        ttk.Label(dialog, text="Tags (comma-separated):").pack(pady=5)
+        tags_entry = ttk.Entry(dialog, width=40)
+        tags_entry.insert(0, ", ".join(tags))
+        tags_entry.pack(pady=5)
+        
+        ttk.Label(dialog, text="Description (optional):").pack(pady=5)
+        desc_entry = ttk.Entry(dialog, width=40)
+        desc_entry.pack(pady=5)
+        
+        def confirm():
+            name = name_entry.get().strip()
+            tags_str = tags_entry.get().strip()
+            tags = [t.strip() for t in tags_str.split(",") if t.strip()] if tags_str else []
+            desc = desc_entry.get().strip()
+            
+            if not name:
+                messagebox.showwarning("Invalid Input", "Part name cannot be empty.", parent=dialog)
+                return
+            
+            try:
+                self.parts_db.add_individual_part(name=name, tags=tags, description=desc)
+                messagebox.showinfo("Success", f"Part '{name}' saved to database!", parent=dialog)
+                dialog.destroy()
+            except ValueError as e:
+                messagebox.showerror("Error", str(e), parent=dialog)
+        
+        ttk.Button(dialog, text="Save", command=confirm).pack(pady=10)
+    
+    def on_load_part_from_db(self):
+        """Загружает часть из базы данных и вставляет её как дочернюю к выбранной"""
+        selection = self.body_parts_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a parent part.", parent=self.parent)
+            return
+        
+        parent_item = selection[0]
+        parent_name = self.body_parts_tree.item(parent_item, "text")
+        
+        # Диалог выбора части из базы
+        dialog = tk.Toplevel(self.parent)
+        dialog.title("Load Part from Database")
+        dialog.geometry("500x400")
+        dialog.transient(self.parent)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Search:").pack(pady=5)
+        search_entry = ttk.Entry(dialog, width=50)
+        search_entry.pack(pady=5)
+        
+        # Список частей
+        list_frame = ttk.Frame(dialog)
+        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        parts_listbox = tk.Listbox(list_frame, width=60, height=10)
+        parts_scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=parts_listbox.yview)
+        parts_listbox.configure(yscrollcommand=parts_scrollbar.set)
+        
+        parts_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        parts_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Загрузка начального списка
+        parts = self.parts_db.get_individual_parts()
+        for part in parts:
+            tags_str = ", ".join(part.get("tags", []))
+            display = f"{part['name']} [{tags_str}]" if tags_str else part['name']
+            parts_listbox.insert(tk.END, display)
+        
+        def on_search(event=None):
+            search_term = search_entry.get().strip()
+            parts_listbox.delete(0, tk.END)
+            parts = self.parts_db.get_individual_parts(search_term=search_term)
+            for part in parts:
+                tags_str = ", ".join(part.get("tags", []))
+                display = f"{part['name']} [{tags_str}]" if tags_str else part['name']
+                parts_listbox.insert(tk.END, display)
+        
+        search_entry.bind("<KeyRelease>", on_search)
+        
+        def confirm():
+            sel = parts_listbox.curselection()
+            if not sel:
+                messagebox.showwarning("No Selection", "Please select a part.", parent=dialog)
+                return
+            
+            display_text = parts_listbox.get(sel[0])
+            part_name = display_text.split(" [")[0]
+            
+            # Находим часть в базе
+            parts = self.parts_db.get_individual_parts()
+            part_data = next((p for p in parts if p["name"] == part_name), None)
+            
+            if not part_data:
+                messagebox.showerror("Error", "Part not found in database.", parent=dialog)
+                return
+            
+            # Добавляем часть к родителю
+            if parent_name not in self.current_body_structure:
+                self.current_body_structure[parent_name] = []
+            
+            self.current_body_structure[parent_name].append({
+                "name": part_data["name"],
+                "tags": part_data.get("tags", [])
+            })
+            
+            # Сохраняем состояние для Undo
+            self._save_action_state("add_child", {
+                "name": part_data["name"],
+                "tags": part_data.get("tags", []),
+                "parent": parent_name
+            })
+            
+            self.update_body_parts_tree()
+            messagebox.showinfo("Success", f"Part '{part_name}' loaded and added to '{parent_name}'!", parent=dialog)
+            dialog.destroy()
+        
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(pady=10)
+        ttk.Button(btn_frame, text="Load", command=confirm).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def on_save_tree_to_db(self):
+        """Сохраняет всё дерево или выбранное поддерево в базу данных как шаблон"""
+        if not self.current_body_structure.get(None):
+            messagebox.showwarning("Empty Structure", "No body structure to save.", parent=self.parent)
+            return
+        
+        selection = self.body_parts_tree.selection()
+        
+        # Диалог для сохранения дерева
+        dialog = tk.Toplevel(self.parent)
+        dialog.title("Save Tree Template to Database")
+        dialog.geometry("400x250")
+        dialog.transient(self.parent)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Template Name:").pack(pady=5)
+        name_entry = ttk.Entry(dialog, width=40)
+        name_entry.pack(pady=5)
+        
+        ttk.Label(dialog, text="Description (optional):").pack(pady=5)
+        desc_entry = ttk.Entry(dialog, width=40)
+        desc_entry.pack(pady=5)
+        
+        def confirm():
+            name = name_entry.get().strip()
+            desc = desc_entry.get().strip()
+            
+            if not name:
+                messagebox.showwarning("Invalid Input", "Template name cannot be empty.", parent=dialog)
+                return
+            
+            # Формируем структуру дерева
+            def build_tree_dict(part_name):
+                result = {"name": part_name, "children": []}
+                children = self.current_body_structure.get(part_name, [])
+                for child in children:
+                    child_name = child["name"] if isinstance(child, dict) else child
+                    result["children"].append(build_tree_dict(child_name))
+                return result
+            
+            # Если есть выделение, сохраняем только поддерево
+            if selection:
+                item = selection[0]
+                root_name = self.body_parts_tree.item(item, "text")
+                tree_data = build_tree_dict(root_name)
+            else:
+                # Сохраняем всё дерево от корня
+                root_parts = self.current_body_structure.get(None, [])
+                tree_data = {"name": "Body", "children": []}
+                for part in root_parts:
+                    part_name = part["name"] if isinstance(part, dict) else part
+                    if part_name != "Body":
+                        tree_data["children"].append(build_tree_dict(part_name))
+            
+            try:
+                self.parts_db.add_tree_template(name=name, tree_data=tree_data, description=desc)
+                messagebox.showinfo("Success", f"Tree template '{name}' saved to database!", parent=dialog)
+                dialog.destroy()
+            except ValueError as e:
+                messagebox.showerror("Error", str(e), parent=dialog)
+        
+        ttk.Button(dialog, text="Save", command=confirm).pack(pady=10)
+    
+    def on_load_tree_from_db(self):
+        """Загружает шаблон дерева из базы данных"""
+        # Диалог выбора шаблона
+        dialog = tk.Toplevel(self.parent)
+        dialog.title("Load Tree Template from Database")
+        dialog.geometry("500x400")
+        dialog.transient(self.parent)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Search:").pack(pady=5)
+        search_entry = ttk.Entry(dialog, width=50)
+        search_entry.pack(pady=5)
+        
+        # Список шаблонов
+        list_frame = ttk.Frame(dialog)
+        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        templates_listbox = tk.Listbox(list_frame, width=60, height=10)
+        templates_scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=templates_listbox.yview)
+        templates_listbox.configure(yscrollcommand=templates_scrollbar.set)
+        
+        templates_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        templates_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Загрузка начального списка
+        templates = self.parts_db.get_tree_templates()
+        for template in templates:
+            display = f"{template['name']} ({template['part_count']} parts)"
+            templates_listbox.insert(tk.END, display)
+        
+        def on_search(event=None):
+            search_term = search_entry.get().strip()
+            templates_listbox.delete(0, tk.END)
+            templates = self.parts_db.get_tree_templates(search_term=search_term)
+            for template in templates:
+                display = f"{template['name']} ({template['part_count']} parts)"
+                templates_listbox.insert(tk.END, display)
+        
+        search_entry.bind("<KeyRelease>", on_search)
+        
+        def add_tree_recursive(tree_data, parent_key):
+            """Рекурсивно добавляет части дерева"""
+            part_name = tree_data["name"]
+            
+            if parent_key not in self.current_body_structure:
+                self.current_body_structure[parent_key] = []
+            
+            self.current_body_structure[parent_key].append({"name": part_name, "tags": []})
+            
+            if "children" in tree_data:
+                for child in tree_data["children"]:
+                    add_tree_recursive(child, part_name)
+        
+        def confirm():
+            sel = templates_listbox.curselection()
+            if not sel:
+                messagebox.showwarning("No Selection", "Please select a template.", parent=dialog)
+                return
+            
+            display_text = templates_listbox.get(sel[0])
+            template_name = display_text.split(" (")[0]
+            
+            # Находим шаблон в базе
+            templates = self.parts_db.get_tree_templates()
+            template_data = next((t for t in templates if t["name"] == template_name), None)
+            
+            if not template_data:
+                messagebox.showerror("Error", "Template not found in database.", parent=dialog)
+                return
+            
+            # Получаем корневой элемент для вставки
+            selection = self.body_parts_tree.selection()
+            if selection:
+                parent_item = selection[0]
+                parent_name = self.body_parts_tree.item(parent_item, "text")
+            else:
+                # Если нет выделения, добавляем к Body
+                parent_name = "Body"
+                if "Body" not in self.current_body_structure:
+                    self.current_body_structure["Body"] = []
+            
+            # Добавляем дерево
+            tree_data = template_data["tree_data"]
+            add_tree_recursive(tree_data, parent_name)
+            
+            # Сохраняем состояние для Undo
+            self._save_action_state("paste_tree", {
+                "tree_data": copy.deepcopy(tree_data),
+                "parent": parent_name
+            })
+            
+            self.update_body_parts_tree()
+            messagebox.showinfo("Success", f"Tree template '{template_name}' loaded!", parent=dialog)
+            dialog.destroy()
+        
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(pady=10)
+        ttk.Button(btn_frame, text="Load", command=confirm).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def new_body(self):
+        """Создает новое тело (сбрасывает текущую структуру)"""
+        if self.action_history:
+            if not messagebox.askyesno("Confirm", "Clear current work and start a new body?"):
+                return
+        
+        # Сбрасываем структуру и дерево
+        self.current_body_structure = {None: []}
+        self.update_body_parts_tree()
+        
+        # Очищаем поля формы
+        self.new_body_class_name_entry.delete(0, tk.END)
+        self.new_body_display_name_entry.delete(0, tk.END)
+        self.new_body_gender_var.set("N/A")
+        self.new_body_gender_custom_entry.delete(0, tk.END)
+        self.new_body_desc_template_entry.delete(0, tk.END)
+        self.new_body_height_min_entry.delete(0, tk.END)
+        self.new_body_height_min_entry.insert(0, "150")
+        self.new_body_height_max_entry.delete(0, tk.END)
+        self.new_body_height_max_entry.insert(0, "200")
+        self.update_auto_size()
+        
+        # Очищаем историю действий
+        self.action_history.clear()
+        self.redo_stack.clear()
+    
+    def save_body(self):
+        """Сохраняет текущее тело (вызывает on_create_body_type_clicked)"""
+        self.on_create_body_type_clicked()
     
     def on_create_body_type_clicked(self):
         """Обработчик создания нового типа тела через интерфейс."""
