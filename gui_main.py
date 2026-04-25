@@ -301,7 +301,7 @@ class MainWindow(tk.Tk):
         ttk.Label(gender_frame, text="Gender:").pack(side=tk.LEFT, padx=(0, 10))
         self.new_body_gender_var = tk.StringVar(value="N/A")
         gender_combo = ttk.Combobox(gender_frame, textvariable=self.new_body_gender_var, 
-                                    values=["Male", "Female", "N/A", "Other"], state="readonly", width=12)
+                                    values=["Male", "Female", "Herm", "N/A", "Other"], state="readonly", width=12)
         gender_combo.pack(side=tk.LEFT, padx=(0, 10))
         
         ttk.Label(gender_frame, text="Custom (optional):").pack(side=tk.LEFT, padx=(10, 5))
@@ -316,16 +316,25 @@ class MainWindow(tk.Tk):
         tree_frame.grid(row=5, column=1, sticky=tk.EW, pady=5, padx=(10, 0), rowspan=3)
         
         # Дерево для отображения иерархии с поддержкой множественного выбора
-        columns = ("name",)
-        self.body_parts_tree = ttk.Treeview(tree_frame, columns=columns, show="tree", height=8, selectmode="extended")
-        self.body_parts_tree.heading("#0", text="Body Parts")
-        self.body_parts_tree.column("#0", width=250)
+        columns = ("tags",)
+        self.body_parts_tree = ttk.Treeview(tree_frame, columns=columns, show="tree headings", height=8, selectmode="extended")
+        self.body_parts_tree.heading("#0", text="Bodypart")
+        self.body_parts_tree.column("#0", width=200)
+        self.body_parts_tree.heading("tags", text="Tags")
+        self.body_parts_tree.column("tags", width=150)
         
         scrollbar_tree = ttk.Scrollbar(tree_frame, orient="vertical", command=self.body_parts_tree.yview)
         self.body_parts_tree.configure(yscrollcommand=scrollbar_tree.set)
         
         self.body_parts_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar_tree.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Легенда
+        legend_frame = ttk.Frame(form_frame)
+        legend_frame.grid(row=6, column=1, sticky=tk.W, pady=(5, 0), padx=(10, 0))
+        ttk.Label(legend_frame, text="Legend:", font=("Arial", 9, "bold")).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(legend_frame, text="Bodypart - Name of body part").pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(legend_frame, text="Tags - List of tags in brackets").pack(side=tk.LEFT)
         
         # Кнопки управления деревом
         btn_frame = ttk.Frame(form_frame)
@@ -405,29 +414,49 @@ class MainWindow(tk.Tk):
     def update_auto_size(self, event=None):
         """Автоматически определяет категорию размера на основе диапазона высоты."""
         try:
-            min_height = float(self.new_body_height_min_entry.get().strip() or 0)
-            max_height = float(self.new_body_height_max_entry.get().strip() or 0)
+            min_height_str = self.new_body_height_min_entry.get().strip()
+            max_height_str = self.new_body_height_max_entry.get().strip()
+            
+            # Защита от пустых значений и некорректного ввода
+            if not min_height_str or not max_height_str:
+                self.auto_size_label.config(text="Enter values")
+                return
+                
+            min_height = float(min_height_str)
+            max_height = float(max_height_str)
+            
+            # Защита от отрицательных чисел
+            if min_height < 0 or max_height < 0:
+                self.auto_size_label.config(text="No negatives")
+                return
+            
+            # Защита от min > max
+            if min_height > max_height:
+                self.auto_size_label.config(text="Min > Max error")
+                return
             
             # Используем среднее значение для определения категории
-            avg_height = (min_height + max_height) / 2 if max_height > 0 else min_height
+            avg_height = (min_height + max_height) / 2
             
             # Определяем категорию размера на основе средней высоты
             # Для standing height (человеческий стандарт)
-            # Tiny: < 50cm, Small: 50-100cm, Medium: 100-200cm, Large: 200-350cm, Huge: > 350cm
-            if avg_height < 50:
+            # Tiny: < 30cm, Small: 30-100cm, Medium: 100-180cm, Large: 180-400cm, Huge: 400-700cm, Gargantuan: > 700cm
+            if avg_height < 30:
                 size_category = "Tiny"
             elif avg_height < 100:
                 size_category = "Small"
-            elif avg_height < 200:
+            elif avg_height < 180:
                 size_category = "Medium"
-            elif avg_height < 350:
+            elif avg_height < 400:
                 size_category = "Large"
-            else:
+            elif avg_height < 700:
                 size_category = "Huge"
+            else:
+                size_category = "Gargantuan"
             
             self.auto_size_label.config(text=size_category)
         except ValueError:
-            self.auto_size_label.config(text="Invalid")
+            self.auto_size_label.config(text="Invalid input")
 
     def get_final_gender(self):
         """Возвращает итоговое значение пола с учётом custom поля."""
@@ -444,12 +473,12 @@ class MainWindow(tk.Tk):
         expanded_items = set()
         for item in self.body_parts_tree.get_children(""):
             if self.body_parts_tree.item(item, "open"):
-                item_text = self.body_parts_tree.item(item)["text"]
+                item_text = self.body_parts_tree.item(item)["text"].split(" [")[0]  # Убираем теги для пути
                 expanded_items.add(item_text)
                 # Сохраняем также детей этого узла
                 for child_item in self.body_parts_tree.get_children(item):
                     if self.body_parts_tree.item(child_item, "open"):
-                        child_text = self.body_parts_tree.item(child_item)["text"]
+                        child_text = self.body_parts_tree.item(child_item)["text"].split(" [")[0]
                         expanded_items.add(f"{item_text}::{child_text}")
         
         # Очищаем дерево
@@ -465,11 +494,10 @@ class MainWindow(tk.Tk):
                 
                 # Формируем текст для отображения с тегами
                 display_text = child_name
-                if child_tags:
-                    display_text += f" [{', '.join(child_tags)}]"
+                tags_display = f"[{', '.join(child_tags)}]" if child_tags else ""
                 
-                # Добавляем узел в дерево
-                node_id = self.body_parts_tree.insert(parent_node_id, "end", text=display_text, values=(child_name,))
+                # Добавляем узел в дерево: text - имя, values - теги
+                node_id = self.body_parts_tree.insert(parent_node_id, "end", text=display_text, values=(tags_display,))
                 
                 # Проверяем, нужно ли раскрыть этот узел
                 parent_path = ""
@@ -489,10 +517,9 @@ class MainWindow(tk.Tk):
             part_tags = part.get("tags", []) if isinstance(part, dict) else []
             
             display_text = part_name
-            if part_tags:
-                display_text += f" [{', '.join(part_tags)}]"
+            tags_display = f"[{', '.join(part_tags)}]" if part_tags else ""
             
-            node_id = self.body_parts_tree.insert("", "end", text=display_text, values=(part_name,))
+            node_id = self.body_parts_tree.insert("", "end", text=display_text, values=(tags_display,))
             # Раскрываем корневые узлы по умолчанию
             self.body_parts_tree.item(node_id, open=True)
             add_children(node_id, part_name)
@@ -548,8 +575,8 @@ class MainWindow(tk.Tk):
             messagebox.showwarning("No Selection", "Please select one or more parent parts first.", parent=self)
             return
         
-        # Получаем имена всех выбранных родительских узлов
-        parent_names = [self.body_parts_tree.item(item)["values"][0] for item in selected]
+        # Получаем имена всех выбранных родительских узлов (из колонки text, а не values)
+        parent_names = [self.body_parts_tree.item(item)["text"] for item in selected]
         
         dialog = tk.Toplevel(self)
         dialog.title(f"Add Child to {len(parent_names)} part(s)")
@@ -599,7 +626,7 @@ class MainWindow(tk.Tk):
             messagebox.showwarning("No Selection", "Please select a part to delete.", parent=self)
             return
         
-        part_name = self.body_parts_tree.item(selected[0])["values"][0]
+        part_name = self.body_parts_tree.item(selected[0])["text"]
         
         if not messagebox.askyesno("Confirm Delete", f"Delete '{part_name}' and all its children?", parent=self):
             return
@@ -637,7 +664,7 @@ class MainWindow(tk.Tk):
             messagebox.showwarning("No Selection", "Please select a part to rename.", parent=self)
             return
         
-        old_name = self.body_parts_tree.item(selected[0])["values"][0]
+        old_name = self.body_parts_tree.item(selected[0])["text"]
         
         dialog = tk.Toplevel(self)
         dialog.title(f"Rename '{old_name}'")
@@ -884,7 +911,7 @@ class MainWindow(tk.Tk):
             
             # Пол - разбираем и устанавливаем в соответствующие поля
             gender = data.get('gender', 'N/A')
-            standard_genders = ["Male", "Female", "N/A", "Other"]
+            standard_genders = ["Male", "Female", "Herm", "N/A", "Other"]
             if gender in standard_genders:
                 self.new_body_gender_var.set(gender)
                 self.new_body_gender_custom_entry.delete(0, tk.END)
