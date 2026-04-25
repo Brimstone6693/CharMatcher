@@ -250,13 +250,13 @@ AbstractBody._dynamic_body_class = DynamicBody
 
 
 # --- Пример конкретных тел ---
+# Примечание: Эти классы оставлены для обратной совместимости.
+# Для новых типов тел рекомендуется использовать JSON файлы в bodies_data/
+
 class HumanoidBody(AbstractBody):
     def __init__(self, race="Human", size="Medium", gender="Male", **kwargs):
         super().__init__(race, size)
-        # Извлекаем gender из kwargs, если передан, иначе используем значение по умолчанию
         self.gender = kwargs.get('gender', gender)
-        # Или просто self.gender = gender, если передаём напрямую
-        self.gender = gender
         # Инициализируем иерархическую структуру частей тела
         # Формат: {parent: [child1, child2, ...], None: [корневые части]}
         self.body_structure = {
@@ -272,10 +272,7 @@ class HumanoidBody(AbstractBody):
 class QuadrupedalBody(AbstractBody):
     def __init__(self, race="Wolf", size="Medium", gender="Male", **kwargs):
         super().__init__(race, size)
-        # Извлекаем gender из kwargs, если передан, иначе используем значение по умолчанию
         self.gender = kwargs.get('gender', gender)
-        # Или просто self.gender = gender, если передаём напрямую
-        self.gender = gender
         # Инициализируем иерархическую структуру частей тела
         self.body_structure = {
             None: ["head", "torso", "front_left_leg", "front_right_leg", "rear_left_leg", "rear_right_leg", "tail"],
@@ -290,8 +287,6 @@ class QuadrupedalBody(AbstractBody):
 class GhostBody(AbstractBody):
     def __init__(self, race="Spirit", size="Medium", **kwargs):
         super().__init__(race, size)
-        # Извлекаем gender из kwargs, если передан, иначе игнорируем
-        # self.gender = kwargs.get('gender', "N/A") # Если хотим добавить gender и тут
         # Инициализируем иерархическую структуру частей тела
         self.body_structure = {
             None: ["form"],
@@ -302,3 +297,5 @@ class GhostBody(AbstractBody):
         return f"A translucent {self.race} of {self.size} size."
 
 # Убедитесь, что новые классы тел добавлены в папку bodies/ и загружаются module_loader
+# Примечание: HumanoidBody, QuadrupedalBody, GhostBody оставлены для обратной совместимости
+# Рекомендуется использовать JSON файлы в bodies_data/ для новых типов тел

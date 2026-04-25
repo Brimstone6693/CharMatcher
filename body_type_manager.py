@@ -159,7 +159,7 @@ class BodyTypeManager:
         # --- Основная рабочая область ---
         workspace = ttk.Frame(main_frame)
         workspace.grid(row=1, column=0, sticky="nsew")
-        workspace.grid_columnconfigure(0, weight=0)  # Левая панель (когда видима)
+        workspace.grid_columnconfigure(0, weight=1)  # Левая панель (растягивается когда видима)
         workspace.grid_columnconfigure(1, weight=10) # Основное дерево
         workspace.grid_columnconfigure(2, weight=3)  # Правая панель (свойства и список тел)
         workspace.grid_rowconfigure(0, weight=1)     # Все содержимое растягивается
