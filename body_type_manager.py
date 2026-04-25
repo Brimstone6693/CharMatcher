@@ -158,13 +158,20 @@ class BodyTypeManager:
         # --- Основная рабочая область ---
         workspace = ttk.Frame(main_frame)
         workspace.grid(row=1, column=0, sticky="nsew")
-        workspace.grid_columnconfigure(0, weight=1)  # Дерево растягивается
-        workspace.grid_columnconfigure(1, weight=0)  # Панель свойств фиксирована
+        workspace.grid_columnconfigure(0, weight=0)  # Левая панель (список/теги) фиксирована
+        workspace.grid_columnconfigure(1, weight=1)  # Дерево растягивается
+        workspace.grid_columnconfigure(2, weight=0)  # Панель свойств фиксирована
         workspace.grid_rowconfigure(0, weight=1)
         
-        # Левая часть: Дерево частей тела
+        # Левая панель для дополнительных инструментов (список частей или теги)
+        left_panel_container = ttk.Frame(workspace)
+        left_panel_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        left_panel_container.grid_rowconfigure(0, weight=1)
+        left_panel_container.grid_columnconfigure(0, weight=1)
+        
+        # Центральная часть: Дерево частей тела
         tree_container = ttk.LabelFrame(workspace, text="Body Parts Structure", padding=5)
-        tree_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        tree_container.grid(row=0, column=1, sticky="nsew", padx=(0, 5))
         tree_container.grid_columnconfigure(0, weight=1)
         tree_container.grid_rowconfigure(0, weight=1)
         
@@ -208,7 +215,7 @@ class BodyTypeManager:
         
         # Правая панель: Свойства и список тел
         right_panel = ttk.Frame(workspace)
-        right_panel.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        right_panel.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
         right_panel.grid_rowconfigure(0, weight=0)  # Форма свойств не растягивается
         right_panel.grid_rowconfigure(1, weight=1)  # Список тел растягивается
         right_panel.grid_columnconfigure(0, weight=1)
@@ -340,26 +347,18 @@ class BodyTypeManager:
     def show_parts_list(self):
         """Создает и показывает панель списка частей тела."""
         if self.parts_list_frame is not None:
-            # Если фрейм уже создан, просто показываем его и скрываем основное дерево
-            self.parts_list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
-            tree_container = self.body_parts_tree.master
-            tree_container.grid_remove()
+            # Если фрейм уже создан, просто показываем его
+            self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
             self.parts_list_visible = True
             self.toggle_parts_list_btn.config(text="📋 Hide List")
             self.update_parts_list_tree()
             return
         
-        # Получаем текущий контейнер дерева
-        tree_container = self.body_parts_tree.master
-        
-        # Создаем новую панель для списка частей поверх основного дерева
-        self.parts_list_frame = ttk.LabelFrame(tree_container.master, text="All Body Parts (Multiple Roots)", padding=5)
-        self.parts_list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        # Создаем новую панель для списка частей в левом контейнере
+        self.parts_list_frame = ttk.LabelFrame(self.left_panel_container, text="All Body Parts (Multiple Roots)", padding=5)
+        self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
         self.parts_list_frame.grid_columnconfigure(0, weight=1)
         self.parts_list_frame.grid_rowconfigure(0, weight=1)
-        
-        # Скрываем оригинальный контейнер дерева
-        tree_container.grid_remove()
         
         # Дерево со всеми частями (поддержка нескольких корневых узлов)
         columns = ("tags", "path")
@@ -392,13 +391,9 @@ class BodyTypeManager:
         self.toggle_parts_list_btn.config(text="📋 Hide List")
     
     def hide_parts_list(self):
-        """Скрывает панель списка частей тела и показывает основное дерево."""
+        """Скрывает панель списка частей тела."""
         if self.parts_list_frame is not None:
             self.parts_list_frame.grid_remove()
-        
-        # Показываем оригинальное дерево
-        tree_container = self.body_parts_tree.master
-        tree_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
         self.parts_list_visible = False
         self.toggle_parts_list_btn.config(text="📋 List")
@@ -407,25 +402,17 @@ class BodyTypeManager:
         """Создает и показывает панель менеджера тегов."""
         if self.tags_manager_frame is not None:
             # Если фрейм уже создан, просто показываем его
-            self.tags_manager_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
-            tree_container = self.body_parts_tree.master
-            tree_container.grid_remove()
+            self.tags_manager_frame.grid(row=0, column=0, sticky="nsew")
             self.tags_manager_visible = True
             self.toggle_tags_manager_btn.config(text="🏷️ Hide Tags")
             self.update_tags_manager_tree()
             return
         
-        # Получаем текущий контейнер дерева
-        tree_container = self.body_parts_tree.master
-        
-        # Создаем новую панель для менеджера тегов
-        self.tags_manager_frame = ttk.LabelFrame(tree_container.master, text="Tags Manager (Drag & Drop to Tree)", padding=5)
-        self.tags_manager_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        # Создаем новую панель для менеджера тегов в левом контейнере
+        self.tags_manager_frame = ttk.LabelFrame(self.left_panel_container, text="Tags Manager (Drag & Drop to Tree)", padding=5)
+        self.tags_manager_frame.grid(row=0, column=0, sticky="nsew")
         self.tags_manager_frame.grid_columnconfigure(0, weight=1)
         self.tags_manager_frame.grid_rowconfigure(0, weight=1)
-        
-        # Скрываем оригинальный контейнер дерева
-        tree_container.grid_remove()
         
         # Дерево с тегами
         columns = ("category", "description")
@@ -468,13 +455,9 @@ class BodyTypeManager:
         self.toggle_tags_manager_btn.config(text="🏷️ Hide Tags")
     
     def hide_tags_manager(self):
-        """Скрывает панель менеджера тегов и показывает основное дерево."""
+        """Скрывает панель менеджера тегов."""
         if self.tags_manager_frame is not None:
             self.tags_manager_frame.grid_remove()
-        
-        # Показываем оригинальное дерево
-        tree_container = self.body_parts_tree.master
-        tree_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
         self.tags_manager_visible = False
         self.toggle_tags_manager_btn.config(text="🏷️ Tags")
