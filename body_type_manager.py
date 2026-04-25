@@ -647,8 +647,18 @@ class BodyTypeManager:
                 messagebox.showerror("Error", "Tag name cannot be empty!")
                 return
             
-            # Обновляем тег в базе данных
-            self.parts_db.add_or_update_tag(new_name, category, description, old_name=tag_name)
+            # Проверяем, существует ли тег с таким именем (кроме текущего)
+            existing_tags = self.parts_db.get_all_tags()
+            for tag in existing_tags:
+                if tag['name'] == new_name and tag['name'] != tag_name:
+                    messagebox.showerror("Error", f"Tag '{new_name}' already exists!")
+                    return
+            
+            # Обновляем тег в базе данных: удаляем старый и добавляем новый
+            if tag_name != new_name:
+                self.parts_db.delete_tag(tag_name)
+            
+            self.parts_db.add_or_update_tag(new_name, category, description)
             self.update_tags_manager_tree()
             dialog.destroy()
         
@@ -1051,7 +1061,7 @@ class BodyTypeManager:
             add_children(node_id, part_name)
     
     def on_add_root_part(self):
-        """Добавляет корневую часть тела (к ключу None) как дочернюю к Body."""
+        """Добавляет корневую часть тела (к ключу None) как дочернюю к Body с плейсхолдером вместо имени."""
         # Проверяем, существует ли корневой элемент "Body"
         root_parts = self.current_body_structure.get(None, [])
         body_exists = any((isinstance(p, dict) and p.get("name") == "Body") or p == "Body" for p in root_parts)
@@ -1060,68 +1070,52 @@ class BodyTypeManager:
             messagebox.showwarning("Error", "Root 'Body' part is missing. Please reinitialize the structure.", parent=self.parent)
             return
         
-        dialog = tk.Toplevel(self.parent)
-        dialog.title("Add Root Body Part")
-        dialog.geometry("350x180")
-        # Центрируем диалог относительно родительского окна
-        dialog.update_idletasks()
-        x = self.parent.winfo_x() + (self.parent.winfo_width() - dialog.winfo_width()) // 2
-        y = self.parent.winfo_y() + (self.parent.winfo_height() - dialog.winfo_height()) // 2
-        dialog.geometry(f"+{x}+{y}")
-        dialog.transient(self.parent)
-        dialog.grab_set()
+        # Генерируем уникальный ID для части
+        part_id = str(uuid.uuid4())
         
-        ttk.Label(dialog, text="Part Name:").pack(pady=5)
-        entry = ttk.Entry(dialog, width=40)
-        entry.pack(pady=5)
-        entry.focus()
+        # Находим уникальное имя с плейсхолдером
+        base_name = "New_Part"
+        counter = 1
+        new_name = base_name
         
-        ttk.Label(dialog, text="Tags (comma-separated, optional):").pack(pady=5)
-        tags_entry = ttk.Entry(dialog, width=40)
-        tags_entry.pack(pady=5)
+        existing_names = set()
+        for existing in self.current_body_structure.get("Body", []):
+            existing_name = existing["name"] if isinstance(existing, dict) else existing
+            existing_names.add(existing_name)
         
-        def confirm():
-            name = entry.get().strip()
-            tags_str = tags_entry.get().strip()
-            tags = [t.strip() for t in tags_str.split(",") if t.strip()] if tags_str else []
-            
-            if not name:
-                messagebox.showwarning("Invalid Input", "Part name cannot be empty.", parent=dialog)
-                return
-            
-            # Проверяем на дубликат имени у родителя (Body) и добавляем суффикс если нужно
-            existing_names = set()
-            for existing in self.current_body_structure.get("Body", []):
-                existing_name = existing["name"] if isinstance(existing, dict) else existing
-                existing_names.add(existing_name)
-            
-            base_name = name
-            counter = 1
-            new_name = name
-            while new_name in existing_names:
-                new_name = f"{base_name}_{counter}"
-                counter += 1
-            
-            # Генерируем уникальный ID для части
-            part_id = str(uuid.uuid4())
-            
-            # Добавляем как словарь с именем, тегами и ID в список детей "Body" (с уникальным именем)
-            if "Body" not in self.current_body_structure:
-                self.current_body_structure["Body"] = []
-            self.current_body_structure["Body"].append({"name": new_name, "tags": tags, "part_id": part_id})
-            if new_name not in self.current_body_structure:
-                self.current_body_structure[new_name] = []
-            
-            # Сохраняем состояние для Undo
-            self._save_action_state("add_root", {"name": new_name, "tags": tags, "parent": "Body", "part_id": part_id})
-            
-            self.update_body_parts_tree()
-            dialog.destroy()
+        while new_name in existing_names:
+            new_name = f"{base_name}_{counter}"
+            counter += 1
         
-        ttk.Button(dialog, text="Add", command=confirm).pack(pady=10)
+        # Добавляем как словарь с именем-плейсхолдером, пустыми тегами и ID в список детей "Body"
+        if "Body" not in self.current_body_structure:
+            self.current_body_structure["Body"] = []
+        self.current_body_structure["Body"].append({"name": new_name, "tags": [], "part_id": part_id})
+        if new_name not in self.current_body_structure:
+            self.current_body_structure[new_name] = []
+        
+        # Сохраняем состояние для Undo
+        self._save_action_state("add_root", {"name": new_name, "tags": [], "parent": "Body", "part_id": part_id})
+        
+        self.update_body_parts_tree()
+        
+        # Автоматически переходим в режим редактирования имени
+        self._start_rename_mode(new_name)
+    
+    def _start_rename_mode(self, part_name):
+        """Запускает режим переименования для указанной части."""
+        # Находим элемент дерева по имени
+        for item in self.body_parts_tree.get_children(""):
+            text = self.body_parts_tree.item(item)["text"].split(" [")[0]
+            if text == part_name:
+                self.body_parts_tree.selection_set(item)
+                self.body_parts_tree.focus(item)
+                # Запускаем переименование
+                self.on_rename_part()
+                break
     
     def on_add_child_part(self):
-        """Добавляет дочернюю часть к выбранному элементу."""
+        """Добавляет дочернюю часть к выбранному элементу с плейсхолдером вместо имени."""
         selection = self.body_parts_tree.selection()
         if not selection:
             messagebox.showwarning("No Selection", "Please select a parent part first.", parent=self.parent)
@@ -1131,66 +1125,38 @@ class BodyTypeManager:
         selected_item = selection[0]
         parent_name = self.body_parts_tree.item(selected_item)["text"].split(" [")[0]
         
-        dialog = tk.Toplevel(self.parent)
-        dialog.title(f"Add Child to '{parent_name}'")
-        dialog.geometry("350x180")
-        # Центрируем диалог относительно родительского окна
-        dialog.update_idletasks()
-        x = self.parent.winfo_x() + (self.parent.winfo_width() - dialog.winfo_width()) // 2
-        y = self.parent.winfo_y() + (self.parent.winfo_height() - dialog.winfo_height()) // 2
-        dialog.geometry(f"+{x}+{y}")
-        dialog.transient(self.parent)
-        dialog.grab_set()
+        # Генерируем уникальный ID для части
+        part_id = str(uuid.uuid4())
         
-        ttk.Label(dialog, text="Child Part Name:").pack(pady=5)
-        entry = ttk.Entry(dialog, width=40)
-        entry.pack(pady=5)
-        entry.focus()
+        # Находим уникальное имя с плейсхолдером
+        base_name = "New_Child"
+        counter = 1
+        new_name = base_name
         
-        ttk.Label(dialog, text="Tags (comma-separated, optional):").pack(pady=5)
-        tags_entry = ttk.Entry(dialog, width=40)
-        tags_entry.pack(pady=5)
+        existing_names = set()
+        for existing in self.current_body_structure.get(parent_name, []):
+            existing_name = existing["name"] if isinstance(existing, dict) else existing
+            existing_names.add(existing_name)
         
-        def confirm():
-            name = entry.get().strip()
-            tags_str = tags_entry.get().strip()
-            tags = [t.strip() for t in tags_str.split(",") if t.strip()] if tags_str else []
-            
-            if not name:
-                messagebox.showwarning("Invalid Input", "Part name cannot be empty.", parent=dialog)
-                return
-            
-            # Проверяем на дубликат имени у родителя и добавляем суффикс если нужно
-            existing_names = set()
-            for existing in self.current_body_structure.get(parent_name, []):
-                existing_name = existing["name"] if isinstance(existing, dict) else existing
-                existing_names.add(existing_name)
-            
-            base_name = name
-            counter = 1
-            new_name = name
-            while new_name in existing_names:
-                new_name = f"{base_name}_{counter}"
-                counter += 1
-            
-            # Генерируем уникальный ID для части
-            part_id = str(uuid.uuid4())
-            
-            # Добавляем как словарь с именем, тегами и ID (с уникальным именем)
-            if parent_name not in self.current_body_structure:
-                self.current_body_structure[parent_name] = []
-            
-            self.current_body_structure[parent_name].append({"name": new_name, "tags": tags, "part_id": part_id})
-            if new_name not in self.current_body_structure:
-                self.current_body_structure[new_name] = []
-            
-            # Сохраняем состояние для Undo
-            self._save_action_state("add_child", {"name": new_name, "tags": tags, "parent": parent_name, "part_id": part_id})
-            
-            self.update_body_parts_tree()
-            dialog.destroy()
+        while new_name in existing_names:
+            new_name = f"{base_name}_{counter}"
+            counter += 1
         
-        ttk.Button(dialog, text="Add", command=confirm).pack(pady=10)
+        # Добавляем как словарь с именем-плейсхолдером, пустыми тегами и ID
+        if parent_name not in self.current_body_structure:
+            self.current_body_structure[parent_name] = []
+        
+        self.current_body_structure[parent_name].append({"name": new_name, "tags": [], "part_id": part_id})
+        if new_name not in self.current_body_structure:
+            self.current_body_structure[new_name] = []
+        
+        # Сохраняем состояние для Undo
+        self._save_action_state("add_child", {"name": new_name, "tags": [], "parent": parent_name, "part_id": part_id})
+        
+        self.update_body_parts_tree()
+        
+        # Автоматически переходим в режим редактирования имени
+        self._start_rename_mode(new_name)
     
     def on_delete_part(self):
         """Удаляет выбранную часть тела и все её дочерние элементы."""
