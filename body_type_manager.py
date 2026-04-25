@@ -75,6 +75,10 @@ class BodyTypeManager:
         self.parts_list_frame = None
         self.parts_list_tree = None
         
+        # Менеджер тегов
+        self.tags_manager_frame = None
+        self.tags_manager_visible = False
+        
         # Загружаем доступные модули и тела
         self._reload_available_bodies()
     
@@ -134,6 +138,10 @@ class BodyTypeManager:
         # Кнопка показа/скрытия списка частей
         self.toggle_parts_list_btn = ttk.Button(parts_frame, text="📋 List", command=self.toggle_parts_list, width=8)
         self.toggle_parts_list_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Кнопка показа/скрытия менеджера тегов
+        self.toggle_tags_manager_btn = ttk.Button(parts_frame, text="🏷️ Tags", command=self.toggle_tags_manager, width=8)
+        self.toggle_tags_manager_btn.pack(side=tk.LEFT, padx=2)
         
         # Группа: База данных
         db_frame = ttk.LabelFrame(top_bar, text="Database", padding=2)
@@ -322,6 +330,13 @@ class BodyTypeManager:
         else:
             self.show_parts_list()
     
+    def toggle_tags_manager(self):
+        """Показывает или скрывает панель менеджера тегов."""
+        if self.tags_manager_visible:
+            self.hide_tags_manager()
+        else:
+            self.show_tags_manager()
+    
     def show_parts_list(self):
         """Создает и показывает панель списка частей тела."""
         if self.parts_list_frame is not None:
@@ -387,6 +402,346 @@ class BodyTypeManager:
         
         self.parts_list_visible = False
         self.toggle_parts_list_btn.config(text="📋 List")
+    
+    def show_tags_manager(self):
+        """Создает и показывает панель менеджера тегов."""
+        if self.tags_manager_frame is not None:
+            # Если фрейм уже создан, просто показываем его
+            self.tags_manager_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+            tree_container = self.body_parts_tree.master
+            tree_container.grid_remove()
+            self.tags_manager_visible = True
+            self.toggle_tags_manager_btn.config(text="🏷️ Hide Tags")
+            self.update_tags_manager_tree()
+            return
+        
+        # Получаем текущий контейнер дерева
+        tree_container = self.body_parts_tree.master
+        
+        # Создаем новую панель для менеджера тегов
+        self.tags_manager_frame = ttk.LabelFrame(tree_container.master, text="Tags Manager (Drag & Drop to Tree)", padding=5)
+        self.tags_manager_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        self.tags_manager_frame.grid_columnconfigure(0, weight=1)
+        self.tags_manager_frame.grid_rowconfigure(0, weight=1)
+        
+        # Скрываем оригинальный контейнер дерева
+        tree_container.grid_remove()
+        
+        # Дерево с тегами
+        columns = ("category", "description")
+        self.tags_tree = ttk.Treeview(self.tags_manager_frame, columns=columns, show="tree headings", selectmode="extended")
+        self.tags_tree.heading("#0", text="Tag Name")
+        self.tags_tree.column("#0", width=200, minwidth=150)
+        self.tags_tree.heading("category", text="Category")
+        self.tags_tree.column("category", width=150, minwidth=100)
+        self.tags_tree.heading("description", text="Description")
+        self.tags_tree.column("description", width=300, minwidth=200)
+        
+        # Вертикальный скроллбар
+        vsb = ttk.Scrollbar(self.tags_manager_frame, orient="vertical", command=self.tags_tree.yview)
+        vsb.grid(row=0, column=1, sticky="ns")
+        
+        # Горизонтальный скроллбар
+        hsb = ttk.Scrollbar(self.tags_manager_frame, orient="horizontal", command=self.tags_tree.xview)
+        hsb.grid(row=1, column=0, sticky="ew")
+        
+        self.tags_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        self.tags_tree.grid(row=0, column=0, sticky="nsew")
+        
+        # Кнопки управления тегами
+        tags_btn_frame = ttk.Frame(self.tags_manager_frame)
+        tags_btn_frame.grid(row=2, column=0, sticky="ew", pady=(5, 0))
+        
+        ttk.Button(tags_btn_frame, text="➕ Add Tag", command=self.on_add_tag).pack(side=tk.LEFT, padx=2)
+        ttk.Button(tags_btn_frame, text="✏️ Edit Tag", command=self.on_edit_tag).pack(side=tk.LEFT, padx=2)
+        ttk.Button(tags_btn_frame, text="🗑️ Delete Tag", command=self.on_delete_tag).pack(side=tk.LEFT, padx=2)
+        ttk.Button(tags_btn_frame, text="📁 Import Tags", command=self.on_import_tags).pack(side=tk.LEFT, padx=2)
+        ttk.Button(tags_btn_frame, text="💾 Export Tags", command=self.on_export_tags).pack(side=tk.LEFT, padx=2)
+        
+        # Заполняем дерево тегами
+        self.update_tags_manager_tree()
+        
+        # Drag and Drop поддержка
+        self._setup_tags_drag_and_drop()
+        
+        self.tags_manager_visible = True
+        self.toggle_tags_manager_btn.config(text="🏷️ Hide Tags")
+    
+    def hide_tags_manager(self):
+        """Скрывает панель менеджера тегов и показывает основное дерево."""
+        if self.tags_manager_frame is not None:
+            self.tags_manager_frame.grid_remove()
+        
+        # Показываем оригинальное дерево
+        tree_container = self.body_parts_tree.master
+        tree_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        
+        self.tags_manager_visible = False
+        self.toggle_tags_manager_btn.config(text="🏷️ Tags")
+    
+    def update_tags_manager_tree(self):
+        """Обновляет дерево менеджера тегов."""
+        if not hasattr(self, 'tags_tree') or self.tags_tree is None:
+            return
+        
+        # Очищаем дерево
+        for item in self.tags_tree.get_children():
+            self.tags_tree.delete(item)
+        
+        # Получаем все теги из базы данных
+        all_tags = self.parts_db.get_all_tags()
+        
+        # Группируем теги по категориям
+        categories = {}
+        for tag_info in all_tags:
+            category = tag_info.get('category', 'General')
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(tag_info)
+        
+        # Добавляем категории и теги в дерево
+        for category, tags in sorted(categories.items()):
+            cat_id = self.tags_tree.insert("", "end", text=category, values=("", ""))
+            for tag_info in sorted(tags, key=lambda x: x['name']):
+                tag_name = tag_info['name']
+                description = tag_info.get('description', '')
+                self.tags_tree.insert(cat_id, "end", text=tag_name, values=(category, description))
+    
+    def on_add_tag(self):
+        """Открывает диалог добавления нового тега."""
+        dialog = tk.Toplevel(self.parent)
+        dialog.title("Add New Tag")
+        dialog.transient(self.parent)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Tag Name:").grid(row=0, column=0, sticky=tk.W, pady=5, padx=5)
+        tag_name_entry = ttk.Entry(dialog, width=30)
+        tag_name_entry.grid(row=0, column=1, sticky=tk.EW, pady=5, padx=5)
+        
+        ttk.Label(dialog, text="Category:").grid(row=1, column=0, sticky=tk.W, pady=5, padx=5)
+        tag_category_entry = ttk.Entry(dialog, width=30)
+        tag_category_entry.grid(row=1, column=1, sticky=tk.EW, pady=5, padx=5)
+        tag_category_entry.insert(0, "General")
+        
+        ttk.Label(dialog, text="Description:").grid(row=2, column=0, sticky=tk.W, pady=5, padx=5)
+        tag_desc_entry = ttk.Entry(dialog, width=30)
+        tag_desc_entry.grid(row=2, column=1, sticky=tk.EW, pady=5, padx=5)
+        
+        def save_tag():
+            name = tag_name_entry.get().strip()
+            category = tag_category_entry.get().strip()
+            description = tag_desc_entry.get().strip()
+            
+            if not name:
+                messagebox.showerror("Error", "Tag name cannot be empty!")
+                return
+            
+            # Сохраняем тег в базу данных
+            self.parts_db.add_or_update_tag(name, category, description)
+            self.update_tags_manager_tree()
+            dialog.destroy()
+        
+        ttk.Button(dialog, text="Save", command=save_tag).grid(row=3, column=0, columnspan=2, pady=10)
+        
+        dialog.wait_window()
+    
+    def on_edit_tag(self):
+        """Открывает диалог редактирования выбранного тега."""
+        selection = self.tags_tree.selection()
+        if not selection:
+            messagebox.showinfo("Info", "Please select a tag to edit.")
+            return
+        
+        item = selection[0]
+        tag_name = self.tags_tree.item(item, "text")
+        
+        # Проверяем, не категория ли это
+        if self.tags_tree.parent(item) == "":
+            messagebox.showinfo("Info", "Please select a specific tag, not a category.")
+            return
+        
+        # Получаем информацию о теге
+        tag_info = self.parts_db.get_tag_by_name(tag_name)
+        if not tag_info:
+            messagebox.showerror("Error", f"Tag '{tag_name}' not found in database.")
+            return
+        
+        dialog = tk.Toplevel(self.parent)
+        dialog.title(f"Edit Tag: {tag_name}")
+        dialog.transient(self.parent)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Tag Name:").grid(row=0, column=0, sticky=tk.W, pady=5, padx=5)
+        tag_name_entry = ttk.Entry(dialog, width=30)
+        tag_name_entry.grid(row=0, column=1, sticky=tk.EW, pady=5, padx=5)
+        tag_name_entry.insert(0, tag_name)
+        
+        ttk.Label(dialog, text="Category:").grid(row=1, column=0, sticky=tk.W, pady=5, padx=5)
+        tag_category_entry = ttk.Entry(dialog, width=30)
+        tag_category_entry.grid(row=1, column=1, sticky=tk.EW, pady=5, padx=5)
+        tag_category_entry.insert(0, tag_info.get('category', 'General'))
+        
+        ttk.Label(dialog, text="Description:").grid(row=2, column=0, sticky=tk.W, pady=5, padx=5)
+        tag_desc_entry = ttk.Entry(dialog, width=30)
+        tag_desc_entry.grid(row=2, column=1, sticky=tk.EW, pady=5, padx=5)
+        tag_desc_entry.insert(0, tag_info.get('description', ''))
+        
+        def save_tag():
+            new_name = tag_name_entry.get().strip()
+            category = tag_category_entry.get().strip()
+            description = tag_desc_entry.get().strip()
+            
+            if not new_name:
+                messagebox.showerror("Error", "Tag name cannot be empty!")
+                return
+            
+            # Обновляем тег в базе данных
+            self.parts_db.add_or_update_tag(new_name, category, description, old_name=tag_name)
+            self.update_tags_manager_tree()
+            dialog.destroy()
+        
+        ttk.Button(dialog, text="Save", command=save_tag).grid(row=3, column=0, columnspan=2, pady=10)
+        
+        dialog.wait_window()
+    
+    def on_delete_tag(self):
+        """Удаляет выбранный тег."""
+        selection = self.tags_tree.selection()
+        if not selection:
+            messagebox.showinfo("Info", "Please select a tag to delete.")
+            return
+        
+        item = selection[0]
+        tag_name = self.tags_tree.item(item, "text")
+        
+        # Проверяем, не категория ли это
+        if self.tags_tree.parent(item) == "":
+            messagebox.showinfo("Info", "Please select a specific tag, not a category.")
+            return
+        
+        if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete tag '{tag_name}'?"):
+            self.parts_db.delete_tag(tag_name)
+            self.update_tags_manager_tree()
+    
+    def on_import_tags(self):
+        """Импортирует теги из JSON файла."""
+        file_path = filedialog.askopenfilename(
+            title="Import Tags from JSON",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        if file_path:
+            try:
+                self.parts_db.import_tags_from_json(file_path)
+                self.update_tags_manager_tree()
+                messagebox.showinfo("Success", "Tags imported successfully!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to import tags: {str(e)}")
+    
+    def on_export_tags(self):
+        """Экспортирует теги в JSON файл."""
+        file_path = filedialog.asksaveasfilename(
+            title="Export Tags to JSON",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        if file_path:
+            try:
+                self.parts_db.export_tags_to_json(file_path)
+                messagebox.showinfo("Success", "Tags exported successfully!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export tags: {str(e)}")
+    
+    def _setup_tags_drag_and_drop(self):
+        """Настраивает Drag and Drop для перетаскивания тегов на части тела."""
+        # Переменная для хранения перетаскиваемого элемента
+        self.dragged_tag_item = None
+        
+        def on_drag_start(event):
+            """Начало перетаскивания."""
+            item = self.tags_tree.identify_row(event.y)
+            if item and self.tags_tree.parent(item) != "":  # Только теги, не категории
+                self.dragged_tag_item = item
+                self.tags_tree.selection_set(item)
+        
+        def on_drag_drop(event):
+            """Завершение перетаскивания - бросок на дерево частей тела."""
+            # Проверяем, был ли бросок на дерево частей тела
+            widget = self.parent.winfo_containing(event.x_root, event.y_root)
+            
+            # Ищем, является ли виджет частью дерева body_parts_tree
+            current_widget = widget
+            while current_widget:
+                if current_widget == self.body_parts_tree:
+                    # Бросок на дерево частей тела
+                    if self.dragged_tag_item:
+                        tag_name = self.tags_tree.item(self.dragged_tag_item, "text")
+                        self._apply_tag_to_selected_part(tag_name)
+                    self.dragged_tag_item = None
+                    return
+                
+                current_widget = current_widget.master
+        
+        def on_drag_end(event):
+            """Очистка после перетаскивания."""
+            self.dragged_tag_item = None
+        
+        # Привязываем события к дереву тегов
+        self.tags_tree.bind("<ButtonPress-1>", on_drag_start)
+        self.tags_tree.bind("<ButtonRelease-1>", on_drag_drop)
+        self.tags_tree.bind("<B1-Motion>", lambda e: None)  # Для визуальной обратной связи можно добавить
+    
+    def _apply_tag_to_selected_part(self, tag_name):
+        """Применяет тег к выбранной части тела."""
+        selection = self.body_parts_tree.selection()
+        if not selection:
+            messagebox.showinfo("Info", "Please select a body part in the tree first.")
+            return
+        
+        item = selection[0]
+        part_name = self.body_parts_tree.item(item, "text").split(" [")[0]
+        
+        # Находим часть в структуре
+        def find_and_update(part_key, parent_key=None):
+            if part_key == part_name:
+                # Находим часть в структуре
+                if parent_key is None:
+                    parts_list = self.current_body_structure.get(None, [])
+                else:
+                    parts_list = self.current_body_structure.get(parent_key, [])
+                
+                for i, part in enumerate(parts_list):
+                    if isinstance(part, dict) and part.get("name") == part_name:
+                        if "tags" not in part:
+                            part["tags"] = []
+                        if tag_name not in part["tags"]:
+                            part["tags"].append(tag_name)
+                        return True
+                    elif part == part_name:
+                        # Конвертируем строку в словарь с тегами
+                        parts_list[i] = {"name": part_name, "tags": [tag_name]}
+                        return True
+            
+            # Рекурсивный поиск в детях
+            children = self.current_body_structure.get(part_key, [])
+            for child in children:
+                child_name = child["name"] if isinstance(child, dict) else child
+                if find_and_update(child_name, part_key):
+                    return True
+            
+            return False
+        
+        # Поиск с корневых элементов
+        root_parts = self.current_body_structure.get(None, [])
+        for part in root_parts:
+            part_name_check = part["name"] if isinstance(part, dict) else part
+            if find_and_update(part_name_check):
+                break
+        
+        # Обновляем дерево
+        self.update_body_parts_tree()
+        if self.parts_list_visible:
+            self.update_parts_list_tree()
+
     
     def update_parts_list_tree(self):
         """Обновляет дерево списка всех частей с поддержкой нескольких корней."""

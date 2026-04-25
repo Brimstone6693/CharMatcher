@@ -185,3 +185,97 @@ class PartsDatabase:
                 t["part_count"] for t in self.data["tree_templates"]
             )
         }
+    
+    # === Методы для работы с тегами (для менеджера тегов) ===
+    
+    def add_or_update_tag(self, name: str, category: str = "General", description: str = ""):
+        """Добавляет или обновляет тег в базе данных"""
+        if not hasattr(self, 'tags'):
+            self.tags = {}
+        
+        name = name.strip()
+        category = category.strip() if category else "General"
+        description = description.strip()
+        
+        self.tags[name] = {
+            "name": name,
+            "category": category,
+            "description": description
+        }
+        self._save_tags()
+    
+    def get_all_tags(self) -> List[Dict]:
+        """Возвращает список всех тегов"""
+        if not hasattr(self, 'tags'):
+            self.tags = {}
+            self._load_tags()
+        return list(self.tags.values())
+    
+    def get_tag_by_name(self, name: str) -> Optional[Dict]:
+        """Возвращает информацию о теге по имени"""
+        if not hasattr(self, 'tags'):
+            self._load_tags()
+        return self.tags.get(name)
+    
+    def delete_tag(self, name: str) -> bool:
+        """Удаляет тег по имени"""
+        if not hasattr(self, 'tags'):
+            self._load_tags()
+        
+        if name in self.tags:
+            del self.tags[name]
+            self._save_tags()
+            return True
+        return False
+    
+    def _load_tags(self):
+        """Загружает теги из файла"""
+        tags_file = self.db_path.parent / "tags_db.json"
+        if tags_file.exists():
+            try:
+                with open(tags_file, 'r', encoding='utf-8') as f:
+                    self.tags = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                self.tags = {}
+        else:
+            self.tags = {}
+    
+    def _save_tags(self):
+        """Сохраняет теги в файл"""
+        if not hasattr(self, 'tags'):
+            self.tags = {}
+        
+        tags_file = self.db_path.parent / "tags_db.json"
+        try:
+            with open(tags_file, 'w', encoding='utf-8') as f:
+                json.dump(self.tags, f, indent=2, ensure_ascii=False)
+            return True
+        except IOError as e:
+            print(f"Error saving tags: {e}")
+            return False
+    
+    def import_tags_from_json(self, file_path: str):
+        """Импортирует теги из JSON файла"""
+        with open(file_path, 'r', encoding='utf-8') as f:
+            imported_tags = json.load(f)
+        
+        if not hasattr(self, 'tags'):
+            self.tags = {}
+        
+        # merged_tags может быть списком или словарём
+        if isinstance(imported_tags, list):
+            for tag in imported_tags:
+                if isinstance(tag, dict) and "name" in tag:
+                    self.tags[tag["name"]] = tag
+        elif isinstance(imported_tags, dict):
+            self.tags.update(imported_tags)
+        
+        self._save_tags()
+    
+    def export_tags_to_json(self, file_path: str):
+        """Экспортирует теги в JSON файл"""
+        if not hasattr(self, 'tags'):
+            self._load_tags()
+        
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(list(self.tags.values()), f, indent=2, ensure_ascii=False)
