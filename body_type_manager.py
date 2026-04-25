@@ -6,6 +6,7 @@
 
 import os
 import json
+import uuid
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import copy  # Импортируем модуль для глубокого копирования
@@ -174,12 +175,15 @@ class BodyTypeManager:
         tree_container.grid_rowconfigure(0, weight=1)
         
         # Дерево с вертикальным и горизонтальным скроллбарами
-        columns = ("tags",)
+        columns = ("tags", "part_id")
         self.body_parts_tree = ttk.Treeview(tree_container, columns=columns, show="tree headings", selectmode="extended")
         self.body_parts_tree.heading("#0", text="Bodypart")
         self.body_parts_tree.column("#0", width=200, minwidth=150)
         self.body_parts_tree.heading("tags", text="Tags")
         self.body_parts_tree.column("tags", width=150, minwidth=100)
+        # Скрываем колонку part_id (используется только для внутренней логики)
+        self.body_parts_tree.heading("part_id", text="ID")
+        self.body_parts_tree.column("part_id", width=0, minwidth=0, stretch=False)
         
         # Вертикальный скроллбар
         vsb = ttk.Scrollbar(tree_container, orient="vertical", command=self.body_parts_tree.yview)
@@ -739,41 +743,56 @@ class BodyTypeManager:
         self.tags_tree.bind("<B1-Motion>", lambda e: None)  # Для визуальной обратной связи можно добавить
     
     def _apply_tag_to_selected_part(self, tag_name):
-        """Применяет тег к выбранной части тела."""
+        """Применяет тег к выбранной части тела по уникальному ID."""
         selection = self.body_parts_tree.selection()
         if not selection:
             messagebox.showinfo("Info", "Please select a body part in the tree first.")
             return
         
         item = selection[0]
-        part_name = self.body_parts_tree.item(item, "text").split(" [")[0]
+        # Получаем part_id из скрытой колонки или из текста
+        item_values = self.body_parts_tree.item(item, "values")
+        # Формат values: (tags_display, part_id)
+        if len(item_values) >= 2 and item_values[1]:
+            part_id = item_values[1]
+        else:
+            # Fallback: ищем по имени (старое поведение)
+            part_name = self.body_parts_tree.item(item, "text").split(" [")[0]
+            part_id = None
         
-        # Находим часть в структуре
-        def find_and_update(part_key, parent_key=None):
-            if part_key == part_name:
-                # Находим часть в структуре
-                if parent_key is None:
-                    parts_list = self.current_body_structure.get(None, [])
-                else:
-                    parts_list = self.current_body_structure.get(parent_key, [])
-                
-                for i, part in enumerate(parts_list):
-                    if isinstance(part, dict) and part.get("name") == part_name:
+        # Находим часть в структуре по ID или по имени
+        def find_and_update_by_id(part_key, parent_key=None, target_id=None, target_name=None):
+            # Проверяем текущий уровень
+            if parent_key is None:
+                parts_list = self.current_body_structure.get(None, [])
+            else:
+                parts_list = self.current_body_structure.get(parent_key, [])
+            
+            for i, part in enumerate(parts_list):
+                if isinstance(part, dict):
+                    # Проверяем совпадение по ID
+                    if target_id and part.get("part_id") == target_id:
                         if "tags" not in part:
                             part["tags"] = []
                         if tag_name not in part["tags"]:
                             part["tags"].append(tag_name)
                         return True
-                    elif part == part_name:
-                        # Конвертируем строку в словарь с тегами
-                        parts_list[i] = {"name": part_name, "tags": [tag_name]}
+                    # Проверяем совпадение по имени (fallback)
+                    elif target_name and part.get("name") == target_name:
+                        if "tags" not in part:
+                            part["tags"] = []
+                        if tag_name not in part["tags"]:
+                            part["tags"].append(tag_name)
                         return True
+                elif part == target_name:
+                    # Конвертируем строку в словарь с тегами
+                    parts_list[i] = {"name": target_name, "tags": [tag_name]}
+                    return True
             
             # Рекурсивный поиск в детях
-            children = self.current_body_structure.get(part_key, [])
-            for child in children:
+            for child in parts_list:
                 child_name = child["name"] if isinstance(child, dict) else child
-                if find_and_update(child_name, part_key):
+                if find_and_update_by_id(child_name, part_key, target_id, target_name):
                     return True
             
             return False
@@ -782,7 +801,7 @@ class BodyTypeManager:
         root_parts = self.current_body_structure.get(None, [])
         for part in root_parts:
             part_name_check = part["name"] if isinstance(part, dict) else part
-            if find_and_update(part_name_check):
+            if find_and_update_by_id(part_name_check, None, part_id, part_name if not part_id else None):
                 break
         
         # Обновляем дерево
@@ -996,13 +1015,14 @@ class BodyTypeManager:
             for child in children:
                 child_name = child["name"] if isinstance(child, dict) else child
                 child_tags = child.get("tags", []) if isinstance(child, dict) else []
+                child_id = child.get("part_id", "") if isinstance(child, dict) else ""
                 
                 # Формируем текст для отображения с тегами
                 display_text = child_name
                 tags_display = f"[{', '.join(child_tags)}]" if child_tags else ""
                 
-                # Добавляем узел в дерево: text - имя, values - теги
-                node_id = self.body_parts_tree.insert(parent_node_id, "end", text=display_text, values=(tags_display,))
+                # Добавляем узел в дерево: text - имя, values - (теги, part_id)
+                node_id = self.body_parts_tree.insert(parent_node_id, "end", text=display_text, values=(tags_display, child_id))
                 
                 # Проверяем, нужно ли раскрыть этот узел
                 parent_path = ""
@@ -1020,11 +1040,12 @@ class BodyTypeManager:
         for part in root_parts:
             part_name = part["name"] if isinstance(part, dict) else part
             part_tags = part.get("tags", []) if isinstance(part, dict) else []
+            part_id = part.get("part_id", "") if isinstance(part, dict) else ""
             
             display_text = part_name
             tags_display = f"[{', '.join(part_tags)}]" if part_tags else ""
             
-            node_id = self.body_parts_tree.insert("", "end", text=display_text, values=(tags_display,))
+            node_id = self.body_parts_tree.insert("", "end", text=display_text, values=(tags_display, part_id))
             # Раскрываем корневые узлы по умолчанию
             self.body_parts_tree.item(node_id, open=True)
             add_children(node_id, part_name)
@@ -1081,15 +1102,18 @@ class BodyTypeManager:
                 new_name = f"{base_name}_{counter}"
                 counter += 1
             
-            # Добавляем как словарь с именем и тегами в список детей "Body" (с уникальным именем)
+            # Генерируем уникальный ID для части
+            part_id = str(uuid.uuid4())
+            
+            # Добавляем как словарь с именем, тегами и ID в список детей "Body" (с уникальным именем)
             if "Body" not in self.current_body_structure:
                 self.current_body_structure["Body"] = []
-            self.current_body_structure["Body"].append({"name": new_name, "tags": tags})
+            self.current_body_structure["Body"].append({"name": new_name, "tags": tags, "part_id": part_id})
             if new_name not in self.current_body_structure:
                 self.current_body_structure[new_name] = []
             
             # Сохраняем состояние для Undo
-            self._save_action_state("add_root", {"name": new_name, "tags": tags, "parent": "Body"})
+            self._save_action_state("add_root", {"name": new_name, "tags": tags, "parent": "Body", "part_id": part_id})
             
             self.update_body_parts_tree()
             dialog.destroy()
@@ -1149,16 +1173,19 @@ class BodyTypeManager:
                 new_name = f"{base_name}_{counter}"
                 counter += 1
             
-            # Добавляем как словарь с именем и тегами (с уникальным именем)
+            # Генерируем уникальный ID для части
+            part_id = str(uuid.uuid4())
+            
+            # Добавляем как словарь с именем, тегами и ID (с уникальным именем)
             if parent_name not in self.current_body_structure:
                 self.current_body_structure[parent_name] = []
             
-            self.current_body_structure[parent_name].append({"name": new_name, "tags": tags})
+            self.current_body_structure[parent_name].append({"name": new_name, "tags": tags, "part_id": part_id})
             if new_name not in self.current_body_structure:
                 self.current_body_structure[new_name] = []
             
             # Сохраняем состояние для Undo
-            self._save_action_state("add_child", {"name": new_name, "tags": tags, "parent": parent_name})
+            self._save_action_state("add_child", {"name": new_name, "tags": tags, "parent": parent_name, "part_id": part_id})
             
             self.update_body_parts_tree()
             dialog.destroy()
@@ -2363,18 +2390,22 @@ class BodyTypeManager:
                     body_structure[None] = body_structure.pop(null_key)
                     break
             
-            # Также нужно нормализовать все части в списках до словарей {name, tags}
+            # Также нужно нормализовать все части в списках до словарей {name, tags, part_id}
             # Создаем новый словарь чтобы избежать изменения во время итерации
             normalized_structure = {}
             for key in body_structure:
                 normalized_list = []
                 for item in body_structure[key]:
                     if isinstance(item, str):
-                        normalized_list.append({"name": item, "tags": []})
+                        # Для строковых частей генерируем новый ID
+                        normalized_list.append({"name": item, "tags": [], "part_id": str(uuid.uuid4())})
                     elif isinstance(item, dict) and "name" in item:
                         # Убеждаемся что tags есть
                         if "tags" not in item:
                             item["tags"] = []
+                        # Убеждаемся что part_id есть (генерируем если нет)
+                        if "part_id" not in item:
+                            item["part_id"] = str(uuid.uuid4())
                         normalized_list.append(item)
                     else:
                         normalized_list.append(item)
