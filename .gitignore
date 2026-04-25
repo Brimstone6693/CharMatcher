@@ -12,37 +12,4 @@ env/
 .env
 .env.local
 .env.*
-
-# Logs
-*.log
-
-# Coverage
-.coverage
-coverage/
-htmlcov/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# Build artifacts
-dist/
-build/
-*.so
-*.dylib
-*.dll
-*.exe
-*.out
-
-# Testing
-.pytest_cache/
-.mypy_cache/
-.tox/
-
-# OS
-.DS_Store
-Thumbs.db
 ```
