@@ -15,7 +15,7 @@ class BodyManagementMixin:
     
     def _reload_available_bodies(self):
         """Перезагружает список доступных компонентов и тел."""
-        self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
+        self.available_components, self.available_bodies = load_available_modules_and_bodies()
     
     def show_start_screen(self):
         """Возвращает к начальному экрану (делегирование родительскому окну)."""
