@@ -185,7 +185,7 @@ class TagsManagerMixin:
                 return
             
             try:
-                self.parts_db.add_tag(name=name, category=category, description=description)
+                self.parts_db.add_or_update_tag(name=name, category=category, description=description)
                 messagebox.showinfo("Success", f"Tag '{name}' created!", parent=dialog)
                 dialog.destroy()
                 self.update_tags_manager_tree()
