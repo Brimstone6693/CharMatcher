@@ -4,29 +4,52 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# Environment
-.venv/
+.Python
+env/
 venv/
-.env
-.env.local
-*.env.*
-
-# Logs and temporary files
-*.log
-*.tmp
-*.swp
-
-# Coverage
+.venv/
+.ENV
+.python-version
+.pytest_cache/
+.mypy_cache/
 .coverage
 coverage/
 htmlcov/
 
-# MyPy
-.mypy_cache/
+# Compiled and build artifacts
+*.o
+*.obj
+*.out
+*.exe
+*.dll
+*.so
+*.a
 
-# PyTest
-.pytest_cache/
+# Dependencies
+node_modules/
+target/
+.gradle/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System
+.DS_Store
+Thumbs.db
 
 # Distribution / packaging
 dist/
