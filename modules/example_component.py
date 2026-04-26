@@ -1,5 +1,5 @@
 # file: modules/example_component.py
-from components import BaseComponent
+from core.components import BaseComponent
 
 class ExampleComponent(BaseComponent):
     def __init__(self, special_value=42):

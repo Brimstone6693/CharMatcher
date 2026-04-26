@@ -1,8 +1,8 @@
 # file: main.py
 import os
 import json # Для сохранения/загрузки
-from character import Character
-from module_loader import load_available_modules_and_bodies # Обновлённая функция
+from core.character import Character
+from core.module_loader import load_available_modules_and_bodies # Обновлённая функция
 # from body import HumanoidBody # Больше не нужен здесь
 
 def main():

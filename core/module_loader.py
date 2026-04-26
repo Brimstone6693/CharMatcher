@@ -2,8 +2,8 @@
 import os
 import importlib.util
 import json
-from components import BaseComponent
-from body_type_manager import AbstractBody, DynamicBody # Импортируем базовый класс тела и динамический класс
+from core.components import BaseComponent
+from core.body_types.body_classes import AbstractBody, DynamicBody # Импортируем базовый класс тела и динамический класс
 
 BODIES_DATA_DIR = "bodies_data"
 

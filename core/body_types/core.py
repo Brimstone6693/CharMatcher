@@ -9,8 +9,8 @@ import uuid
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import copy
-from module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
-from parts_database import PartsDatabase
+from core.module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
+from core.body_types.parts_database import PartsDatabase
 
 from .ui_structure import UIStructureMixin
 from .ui_parts_list import PartsListMixin

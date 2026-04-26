@@ -7,7 +7,7 @@ import os
 import json
 import tkinter as tk
 from tkinter import messagebox, ttk
-from module_loader import BODIES_DATA_DIR, load_available_modules_and_bodies
+from core.module_loader import BODIES_DATA_DIR, load_available_modules_and_bodies
 
 
 class BodyManagementMixin:
