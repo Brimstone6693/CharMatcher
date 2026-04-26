@@ -7,10 +7,15 @@ import os
 import json
 import tkinter as tk
 from tkinter import messagebox, ttk
+from module_loader import BODIES_DATA_DIR, load_available_modules_and_bodies
 
 
 class BodyManagementMixin:
     """Предоставляет функциональность управления типами тел."""
+    
+    def _reload_available_bodies(self):
+        """Перезагружает список доступных компонентов и тел."""
+        self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
     
     def show_start_screen(self):
         """Возвращает к начальному экрану (делегирование родительскому окну)."""
@@ -25,7 +30,8 @@ class BodyManagementMixin:
     def refresh_bodies_list(self):
         """Обновляет список отображаемых типов тел в ListBox."""
         self.bodies_listbox.delete(0, tk.END)
-        for body_name in sorted(self.available_bodies.keys()):
+        # Исключаем "DynamicBody" из списка - это служебный класс для загрузок сохранений
+        for body_name in sorted(k for k in self.available_bodies.keys() if k != "DynamicBody"):
             self.bodies_listbox.insert(tk.END, body_name)
     
     def update_auto_size(self, event=None):
