@@ -1,7 +1,7 @@
-# file: bodies/__init__.py
+# file: body_type_manager/body_classes.py
 """
 Базовые классы для системы тел.
-Заменяет удалённый модуль body.
+Перемещены из пакета bodies в body_type_manager.
 """
 
 import uuid
@@ -35,7 +35,7 @@ class AbstractBody:
         """
         self.race = race
         self.size = size
-        self.body_structure = {}  # {parent_id: [{"part_id": id, "name": name, "tags": []}, ...]}
+        self.body_structure = {}  # {parent_id: [{\"part_id\": id, \"name\": name, \"tags\": []}, ...]}
         self._name_to_id_cache = {}
         self._id_to_part_cache = {}
     
