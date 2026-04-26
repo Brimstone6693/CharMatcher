@@ -1,1 +1,16 @@
-Nothing should be ignored based on the provided file changes. The modification of 'gui/main_window.py' is a source code file that should not be added to .gitignore.
+```
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+```
