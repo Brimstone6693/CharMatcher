@@ -195,6 +195,8 @@ class PartsListMixin:
         Добавляет часть к родителю с уникальным именем.
         Возвращает новое имя части.
         """
+        import uuid
+        
         # Проверяем на дубликат имени у родителя и добавляем суффикс если нужно
         existing_names = set()
         for existing in self.current_body_structure.get(parent_name, []):
@@ -208,22 +210,28 @@ class PartsListMixin:
             new_name = f"{base_name}_{counter}"
             counter += 1
         
+        # Генерируем новый уникальный ID для добавляемой части
+        new_part_id = str(uuid.uuid4())
+        
         # Добавляем часть к родителю с уникальным именем
         if parent_name not in self.current_body_structure:
             self.current_body_structure[parent_name] = []
         
         self.current_body_structure[parent_name].append({
             "name": new_name,
-            "tags": part_data.get("tags", [])
+            "tags": part_data.get("tags", []),
+            "part_id": new_part_id
         })
         
         return new_name
     
     def _add_tree_to_body_recursive(self, tree_data, parent_key, visited=None):
         """
-        Рекурсивно добавляет части дерева с защитой от дублирования имен.
+        Рекурсивно добавляет части дерева с защитой от дублирования имен и генерацией новых ID.
         Использует общую логику с on_load_tree_from_db.
         """
+        import uuid
+        
         if visited is None:
             visited = set()
             
@@ -246,7 +254,9 @@ class PartsListMixin:
             self.current_body_structure[parent_key] = []
         
         tags = tree_data.get("tags", [])
-        self.current_body_structure[parent_key].append({"name": new_name, "tags": tags})
+        # Генерируем новый уникальный ID для добавляемой части
+        new_part_id = str(uuid.uuid4())
+        self.current_body_structure[parent_key].append({"name": new_name, "tags": tags, "part_id": new_part_id})
         
         # Добавляем новое имя в посещенные
         visited.add(new_name)

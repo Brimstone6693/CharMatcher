@@ -404,18 +404,20 @@ class TreeOperationsMixin:
         return True
     
     def _extract_part_structure(self, part_name):
-        """Извлекает полную структуру части включая всех потомков и теги."""
-        # Находим часть в структуре чтобы получить её теги
+        """Извлекает полную структуру части включая всех потомков, теги и ID."""
+        # Находим часть в структуре чтобы получить её теги и ID
         tags = []
+        part_id = ""
         for parent_key, children in self.current_body_structure.items():
             for child in children:
                 child_name = child["name"] if isinstance(child, dict) else child
                 if child_name == part_name:
                     if isinstance(child, dict):
                         tags = child.get("tags", [])
+                        part_id = child.get("part_id", "")
                     break
         
-        result = {"name": part_name, "tags": tags, "children": []}
+        result = {"name": part_name, "tags": tags, "part_id": part_id, "children": []}
         
         children = self.current_body_structure.get(part_name, [])
         for child in children:
@@ -452,7 +454,7 @@ class TreeOperationsMixin:
         self.update_body_parts_tree()
     
     def _paste_part_recursive(self, part_structure, parent_key, visited=None):
-        """Рекурсивно вставляет часть и её потомков с сохранением тегов и ID."""
+        """Рекурсивно вставляет часть и её потомков с сохранением тегов и генерацией новых ID."""
         if visited is None:
             visited = set()
         
@@ -477,7 +479,10 @@ class TreeOperationsMixin:
         # Извлекаем теги из структуры если они есть
         tags = part_structure.get("tags", [])
         
-        self.current_body_structure[parent_key].append({"name": new_name, "tags": tags})
+        # Генерируем новый уникальный ID для вставляемой части
+        new_part_id = str(uuid.uuid4())
+        
+        self.current_body_structure[parent_key].append({"name": new_name, "tags": tags, "part_id": new_part_id})
         
         # Добавляем новое имя в посещенные
         visited.add(new_name)
