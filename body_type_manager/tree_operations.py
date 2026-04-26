@@ -404,8 +404,18 @@ class TreeOperationsMixin:
         return True
     
     def _extract_part_structure(self, part_name):
-        """Извлекает полную структуру части включая всех потомков."""
-        result = {"name": part_name, "children": []}
+        """Извлекает полную структуру части включая всех потомков и теги."""
+        # Находим часть в структуре чтобы получить её теги
+        tags = []
+        for parent_key, children in self.current_body_structure.items():
+            for child in children:
+                child_name = child["name"] if isinstance(child, dict) else child
+                if child_name == part_name:
+                    if isinstance(child, dict):
+                        tags = child.get("tags", [])
+                    break
+        
+        result = {"name": part_name, "tags": tags, "children": []}
         
         children = self.current_body_structure.get(part_name, [])
         for child in children:
@@ -442,7 +452,7 @@ class TreeOperationsMixin:
         self.update_body_parts_tree()
     
     def _paste_part_recursive(self, part_structure, parent_key, visited=None):
-        """Рекурсивно вставляет часть и её потомков."""
+        """Рекурсивно вставляет часть и её потомков с сохранением тегов и ID."""
         if visited is None:
             visited = set()
         
@@ -464,7 +474,10 @@ class TreeOperationsMixin:
         if parent_key not in self.current_body_structure:
             self.current_body_structure[parent_key] = []
         
-        self.current_body_structure[parent_key].append({"name": new_name, "tags": []})
+        # Извлекаем теги из структуры если они есть
+        tags = part_structure.get("tags", [])
+        
+        self.current_body_structure[parent_key].append({"name": new_name, "tags": tags})
         
         # Добавляем новое имя в посещенные
         visited.add(new_name)
