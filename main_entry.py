@@ -10,7 +10,8 @@ def main():
 
     # Шаг 1: Загрузка модулей и тел
     print("\nLoading available modules and body types...")
-    available_components, available_bodies = load_available_modules_and_bodies("modules", "bodies") # Папки рядом с main.py
+    # Пути теперь определяются автоматически в module_loader.py относительно корня проекта
+    available_components, available_bodies = load_available_modules_and_bodies()
 
     if not available_components and not available_bodies:
         print("No modules or body types found in 'modules' or 'bodies' directories!")

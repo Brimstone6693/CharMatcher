@@ -5,18 +5,27 @@ import json
 from core.components import BaseComponent
 from core.body_types.body_classes import AbstractBody, DynamicBody # Импортируем базовый класс тела и динамический класс
 
-BODIES_DATA_DIR = "bodies_data"
+# Получаем директорию проекта (родительскую от директории этого файла)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODULES_DIR = os.path.join(PROJECT_ROOT, "modules")
+BODIES_DATA_DIR = os.path.join(PROJECT_ROOT, "bodies_data")
 
-def load_available_modules_and_bodies(components_dir="modules", bodies_dir="bodies"):
+def load_available_modules_and_bodies(components_dir=None, bodies_dir=None):
     """
     Сканирует директории components_dir и bodies_data_dir для JSON файлов,
     и загружает все классы, наследующиеся от BaseComponent или AbstractBody соответственно.
     Возвращает два словаря: {имя_компонента: класс}, {имя_тела: экземпляр DynamicBody}.
     """
+    # Используем переданные пути или пути по умолчанию (относительно корня проекта)
+    if components_dir is None:
+        components_dir = MODULES_DIR
+    if bodies_dir is None:
+        bodies_dir = BODIES_DATA_DIR
+        
     available_components = {}
     available_bodies = {}
 
-    print(f"Scanning directories: {components_dir}, {BODIES_DATA_DIR}")
+    print(f"Scanning directories: {components_dir}, {bodies_dir}")
 
     # Загрузка компонентов
     for filename in os.listdir(components_dir):
@@ -42,10 +51,10 @@ def load_available_modules_and_bodies(components_dir="modules", bodies_dir="bodi
     available_bodies["DynamicBody"] = DynamicBody  # Сам класс, а не экземпляр
 
     # Загрузка тел из JSON файлов
-    if os.path.exists(BODIES_DATA_DIR):
-        for filename in os.listdir(BODIES_DATA_DIR):
+    if os.path.exists(bodies_dir):
+        for filename in os.listdir(bodies_dir):
             if filename.endswith(".json"):
-                filepath = os.path.join(BODIES_DATA_DIR, filename)
+                filepath = os.path.join(bodies_dir, filename)
                 try:
                     with open(filepath, 'r', encoding='utf-8') as f:
                         data = json.load(f)
@@ -64,7 +73,7 @@ def load_available_modules_and_bodies(components_dir="modules", bodies_dir="bodi
                 except Exception as e:
                     print(f"  Error loading body JSON {filename}: {e}")
     else:
-        print(f"  Warning: Bodies data directory '{BODIES_DATA_DIR}' does not exist.")
+        print(f"  Warning: Bodies data directory '{bodies_dir}' does not exist.")
 
     return available_components, available_bodies
 
