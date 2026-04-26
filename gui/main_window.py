@@ -683,7 +683,7 @@ class MainWindow(tk.Tk):
             
             # Перезагрузка списка доступных тел
             # Просто заново вызываем загрузчик
-            self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
+            self.available_components, self.available_bodies = load_available_modules_and_bodies()
             print(f"GUI: Reloaded modules. Now have {len(self.available_bodies)} bodies.")
             
             # Обновляем список в интерфейсе
@@ -889,7 +889,7 @@ class MainWindow(tk.Tk):
                     os.remove(old_filepath)
                 
                 # Перезагружаем список тел
-                self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
+                self.available_components, self.available_bodies = load_available_modules_and_bodies()
                 self.refresh_bodies_list()
                 
                 messagebox.showinfo("Success", f"Successfully renamed '{old_name}' to '{new_name}'.")
@@ -964,7 +964,7 @@ class MainWindow(tk.Tk):
                     json.dump(data, f, indent=4, ensure_ascii=False)
                 
                 # Перезагружаем список тел
-                self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
+                self.available_components, self.available_bodies = load_available_modules_and_bodies()
                 self.refresh_bodies_list()
                 
                 messagebox.showinfo("Success", f"Successfully copied '{old_name}' to '{new_name}'.")
@@ -996,7 +996,7 @@ class MainWindow(tk.Tk):
                 os.remove(filepath)
                 
                 # Перезагружаем список тел
-                self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
+                self.available_components, self.available_bodies = load_available_modules_and_bodies()
                 self.refresh_bodies_list()
                 
                 messagebox.showinfo("Success", f"Successfully deleted '{body_name}'.")
