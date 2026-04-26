@@ -1,17 +1,50 @@
 # file: bodies/quadrupedal_body.py
-from body import AbstractBody
+from bodies import AbstractBody, generate_short_id
 
 class QuadrupedalBody(AbstractBody):
     def __init__(self, race="Wolf", size="Medium", gender="Male"):
         super().__init__(race, size)
         self.gender = gender
-        # Инициализируем иерархическую структуру частей тела
+        # Инициализируем иерархическую структуру частей тела с короткими ID
+        
+        # Генерируем ID для всех частей
+        head_id = generate_short_id()
+        torso_id = generate_short_id()
+        fl_leg_id = generate_short_id()
+        fr_leg_id = generate_short_id()
+        rl_leg_id = generate_short_id()
+        rr_leg_id = generate_short_id()
+        tail_id = generate_short_id()
+        eyes_id = generate_short_id()
+        ears_id = generate_short_id()
+        mouth_id = generate_short_id()
+        nose_id = generate_short_id()
+        teeth_id = generate_short_id()
+        tongue_id = generate_short_id()
+        
         self.body_structure = {
-            None: ["head", "torso", "front_left_leg", "front_right_leg", "rear_left_leg", "rear_right_leg", "tail"],
-            "head": ["eyes", "ears", "mouth", "nose"],
-            "mouth": ["teeth", "tongue"],
-            "tail": []
+            None: [
+                {"part_id": head_id, "name": "head", "tags": []},
+                {"part_id": torso_id, "name": "torso", "tags": []},
+                {"part_id": fl_leg_id, "name": "front_left_leg", "tags": []},
+                {"part_id": fr_leg_id, "name": "front_right_leg", "tags": []},
+                {"part_id": rl_leg_id, "name": "rear_left_leg", "tags": []},
+                {"part_id": rr_leg_id, "name": "rear_right_leg", "tags": []},
+                {"part_id": tail_id, "name": "tail", "tags": []}
+            ],
+            head_id: [
+                {"part_id": eyes_id, "name": "eyes", "tags": []},
+                {"part_id": ears_id, "name": "ears", "tags": []},
+                {"part_id": mouth_id, "name": "mouth", "tags": []},
+                {"part_id": nose_id, "name": "nose", "tags": []}
+            ],
+            mouth_id: [
+                {"part_id": teeth_id, "name": "teeth", "tags": []},
+                {"part_id": tongue_id, "name": "tongue", "tags": []}
+            ],
+            tail_id: []
         }
+        self._rebuild_name_cache()
 
     def describe_appearance(self):
         return f"A {self.size} {self.gender} {self.race} with a quadrupedal body."

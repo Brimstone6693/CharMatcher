@@ -5,10 +5,18 @@
 
 import copy
 from tkinter import messagebox
+from typing import List, Dict, Any
 
 
 class HistoryMixin:
     """Предоставляет функциональность Undo/Redo для BodyTypeManager."""
+    
+    # Атрибуты, которые должны быть инициализированы в использующем классе
+    action_history: List[Dict[str, Any]]
+    redo_stack: List[Dict[str, Any]]
+    max_history_size: int
+    current_body_structure: Dict
+    parent: Any
     
     def _save_action_state(self, action_type, data):
         """

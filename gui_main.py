@@ -5,7 +5,7 @@ import os
 import json
 from character import Character
 from module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
-from body import AbstractBody
+from bodies import AbstractBody
 from components import BaseComponent
 
 class MainWindow(tk.Tk):
