@@ -1033,7 +1033,7 @@ class BodyTypeManager:
         
         # Проверяем, является ли элемент составной частью (деревом)
         if display_text.startswith("🌳 "):
-            # Это составная часть (дерево)
+            # Это составная часть (дерево) - используем общую логику из on_load_tree_from_db
             tree_name = display_text[3:]  # Убираем эмодзи
             
             # Получаем данные дерева из базы
@@ -1044,84 +1044,28 @@ class BodyTypeManager:
                 messagebox.showerror("Error", "Tree template not found in database.", parent=self.parent)
                 return
             
-            # Спрашиваем у пользователя, куда добавить дерево
-            dialog = tk.Toplevel(self.parent)
-            dialog.title("Add Tree to Body")
-            dialog.geometry("400x200")
-            dialog.transient(self.parent)
-            dialog.grab_set()
+            # Проверяем выделение в основном дереве
+            tree_selection = self.body_parts_tree.selection()
+            if not tree_selection:
+                messagebox.showwarning("No Selection", "Please select a parent part in the main tree first.", parent=self.parent)
+                return
             
-            ttk.Label(dialog, text="Select parent part in the main tree first,\nthen click 'Add' to add this tree as children.").pack(pady=10)
+            parent_item = tree_selection[0]
+            parent_name = self.body_parts_tree.item(parent_item, "text")
             
-            def add_tree_to_selected():
-                tree_selection = self.body_parts_tree.selection()
-                if not tree_selection:
-                    messagebox.showwarning("No Selection", "Please select a parent part in the main tree.", parent=dialog)
-                    return
-                
-                parent_item = tree_selection[0]
-                parent_name = self.body_parts_tree.item(parent_item, "text")
-                
-                # Добавляем всё дерево к родителю
-                tree_structure = tree_data.get("tree_data", {})
-                
-                # Рекурсивно добавляем части дерева
-                def add_tree_recursive(tree_node, parent_key):
-                    if not isinstance(tree_node, dict):
-                        return
-                    
-                    node_name = tree_node.get("name", "Unknown")
-                    
-                    # Проверяем на дубликат имени и добавляем суффикс если нужно
-                    existing_names = set()
-                    for existing in self.current_body_structure.get(parent_key, []):
-                        existing_name = existing["name"] if isinstance(existing, dict) else existing
-                        existing_names.add(existing_name)
-                    
-                    base_name = node_name
-                    counter = 1
-                    new_name = node_name
-                    while new_name in existing_names:
-                        new_name = f"{base_name}_{counter}"
-                        counter += 1
-                    
-                    # Создаём новую часть
-                    new_part = {
-                        "name": new_name,
-                        "tags": tree_node.get("tags", [])
-                    }
-                    
-                    if parent_key not in self.current_body_structure:
-                        self.current_body_structure[parent_key] = []
-                    
-                    self.current_body_structure[parent_key].append(new_part)
-                    
-                    # Рекурсивно добавляем детей
-                    if "children" in tree_node:
-                        for child in tree_node["children"]:
-                            add_tree_recursive(child, new_name)
-                
-                # Добавляем корневые элементы дерева
-                if "children" in tree_structure:
-                    for child in tree_structure["children"]:
-                        add_tree_recursive(child, parent_name)
-                
-                # Сохраняем состояние для Undo
-                self._save_action_state("add_tree", {
-                    "tree_name": tree_name,
-                    "parent": parent_name
-                })
-                
-                self.update_body_parts_tree()
-                messagebox.showinfo("Success", f"Tree '{tree_name}' added to '{parent_name}'!", parent=dialog)
-                dialog.destroy()
+            # Используем общую рекурсивную функцию для добавления дерева
+            self._add_tree_to_body_recursive(tree_data["tree_data"], parent_name)
             
-            btn_frame = ttk.Frame(dialog)
-            btn_frame.pack(pady=10)
-            ttk.Button(btn_frame, text="Add to Selected", command=add_tree_to_selected).pack(side=tk.LEFT, padx=5)
-            ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+            # Сохраняем состояние для Undo
+            self._save_action_state("paste_tree", {
+                "tree_data": copy.deepcopy(tree_data["tree_data"]),
+                "parent": parent_name
+            })
+            
+            self.update_body_parts_tree()
+            self.update_parts_list_tree()  # Обновляем список частей после добавления
         else:
-            # Это индивидуальная часть
+            # Это индивидуальная часть - используем общую логику из on_load_part_from_db
             part_name = display_text
             
             # Получаем данные части из базы
@@ -1132,61 +1076,92 @@ class BodyTypeManager:
                 messagebox.showerror("Error", "Part not found in database.", parent=self.parent)
                 return
             
-            # Спрашиваем у пользователя, куда добавить часть
-            dialog = tk.Toplevel(self.parent)
-            dialog.title("Add Part to Body")
-            dialog.geometry("400x200")
-            dialog.transient(self.parent)
-            dialog.grab_set()
+            # Проверяем выделение в основном дереве
+            tree_selection = self.body_parts_tree.selection()
+            if not tree_selection:
+                messagebox.showwarning("No Selection", "Please select a parent part in the main tree first.", parent=self.parent)
+                return
             
-            ttk.Label(dialog, text="Select parent part in the main tree first,\nthen click 'Add' to add this part as a child.").pack(pady=10)
+            parent_item = tree_selection[0]
+            parent_name = self.body_parts_tree.item(parent_item, "text")
             
-            def add_to_selected():
-                tree_selection = self.body_parts_tree.selection()
-                if not tree_selection:
-                    messagebox.showwarning("No Selection", "Please select a parent part in the main tree.", parent=dialog)
-                    return
-                
-                parent_item = tree_selection[0]
-                parent_name = self.body_parts_tree.item(parent_item, "text")
-                
-                # Проверяем на дубликат имени у родителя и добавляем суффикс если нужно
-                existing_names = set()
-                for existing in self.current_body_structure.get(parent_name, []):
-                    existing_name = existing["name"] if isinstance(existing, dict) else existing
-                    existing_names.add(existing_name)
-                
-                base_name = part_data["name"]
-                counter = 1
-                new_name = part_data["name"]
-                while new_name in existing_names:
-                    new_name = f"{base_name}_{counter}"
-                    counter += 1
-                
-                # Добавляем часть к родителю с уникальным именем
-                if parent_name not in self.current_body_structure:
-                    self.current_body_structure[parent_name] = []
-                
-                self.current_body_structure[parent_name].append({
-                    "name": new_name,
-                    "tags": part_data.get("tags", [])
-                })
-                
-                # Сохраняем состояние для Undo
-                self._save_action_state("add_child", {
-                    "name": new_name,
-                    "tags": part_data.get("tags", []),
-                    "parent": parent_name
-                })
-                
-                self.update_body_parts_tree()
-                messagebox.showinfo("Success", f"Part '{part_name}' added to '{parent_name}'!", parent=dialog)
-                dialog.destroy()
+            # Используем общую логику для добавления части
+            new_name = self._add_part_to_body(part_data, parent_name)
             
-            btn_frame = ttk.Frame(dialog)
-            btn_frame.pack(pady=10)
-            ttk.Button(btn_frame, text="Add to Selected", command=add_to_selected).pack(side=tk.LEFT, padx=5)
-            ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+            # Сохраняем состояние для Undo
+            self._save_action_state("add_child", {
+                "name": new_name,
+                "tags": part_data.get("tags", []),
+                "parent": parent_name
+            })
+            
+            self.update_body_parts_tree()
+            self.update_parts_list_tree()  # Обновляем список частей после добавления
+    
+    def _add_part_to_body(self, part_data, parent_name):
+        """
+        Добавляет часть к родителю с уникальным именем.
+        Возвращает новое имя части.
+        """
+        # Проверяем на дубликат имени у родителя и добавляем суффикс если нужно
+        existing_names = set()
+        for existing in self.current_body_structure.get(parent_name, []):
+            existing_name = existing["name"] if isinstance(existing, dict) else existing
+            existing_names.add(existing_name)
+        
+        base_name = part_data["name"]
+        counter = 1
+        new_name = part_data["name"]
+        while new_name in existing_names:
+            new_name = f"{base_name}_{counter}"
+            counter += 1
+        
+        # Добавляем часть к родителю с уникальным именем
+        if parent_name not in self.current_body_structure:
+            self.current_body_structure[parent_name] = []
+        
+        self.current_body_structure[parent_name].append({
+            "name": new_name,
+            "tags": part_data.get("tags", [])
+        })
+        
+        return new_name
+    
+    def _add_tree_to_body_recursive(self, tree_data, parent_key, visited=None):
+        """
+        Рекурсивно добавляет части дерева с защитой от дублирования имен.
+        Использует общую логику с on_load_tree_from_db.
+        """
+        if visited is None:
+            visited = set()
+            
+        part_name = tree_data["name"]
+        
+        # Проверяем на дубликат имени у родителя и добавляем суффикс если нужно
+        existing_names = set()
+        for existing in self.current_body_structure.get(parent_key, []):
+            existing_name = existing["name"] if isinstance(existing, dict) else existing
+            existing_names.add(existing_name)
+        
+        base_name = part_name
+        counter = 1
+        new_name = part_name
+        while new_name in existing_names:
+            new_name = f"{base_name}_{counter}"
+            counter += 1
+        
+        if parent_key not in self.current_body_structure:
+            self.current_body_structure[parent_key] = []
+        
+        tags = tree_data.get("tags", [])
+        self.current_body_structure[parent_key].append({"name": new_name, "tags": tags})
+        
+        # Добавляем новое имя в посещенные
+        visited.add(new_name)
+        
+        if "children" in tree_data:
+            for child in tree_data["children"]:
+                self._add_tree_to_body_recursive(child, new_name, visited.copy())
     
     def update_auto_size(self, event=None):
         """Автоматически определяет категорию размера на основе диапазона высоты."""
@@ -1982,27 +1957,8 @@ class BodyTypeManager:
                 messagebox.showerror("Error", "Part not found in database.", parent=dialog)
                 return
             
-            # Проверяем на дубликат имени у родителя и добавляем суффикс если нужно
-            existing_names = set()
-            for existing in self.current_body_structure.get(parent_name, []):
-                existing_name = existing["name"] if isinstance(existing, dict) else existing
-                existing_names.add(existing_name)
-            
-            base_name = part_data["name"]
-            counter = 1
-            new_name = part_data["name"]
-            while new_name in existing_names:
-                new_name = f"{base_name}_{counter}"
-                counter += 1
-            
-            # Добавляем часть к родителю с уникальным именем
-            if parent_name not in self.current_body_structure:
-                self.current_body_structure[parent_name] = []
-            
-            self.current_body_structure[parent_name].append({
-                "name": new_name,
-                "tags": part_data.get("tags", [])
-            })
+            # Используем общую логику для добавления части
+            new_name = self._add_part_to_body(part_data, parent_name)
             
             # Сохраняем состояние для Undo
             self._save_action_state("add_child", {
@@ -2123,39 +2079,6 @@ class BodyTypeManager:
         
         search_entry.bind("<KeyRelease>", on_search)
         
-        def add_tree_recursive(tree_data, parent_key, visited=None):
-            """Рекурсивно добавляет части дерева с защитой от дублирования имен"""
-            if visited is None:
-                visited = set()
-                
-            part_name = tree_data["name"]
-            
-            # Проверяем на дубликат имени у родителя и добавляем суффикс если нужно
-            existing_names = set()
-            for existing in self.current_body_structure.get(parent_key, []):
-                existing_name = existing["name"] if isinstance(existing, dict) else existing
-                existing_names.add(existing_name)
-            
-            base_name = part_name
-            counter = 1
-            new_name = part_name
-            while new_name in existing_names:
-                new_name = f"{base_name}_{counter}"
-                counter += 1
-            
-            if parent_key not in self.current_body_structure:
-                self.current_body_structure[parent_key] = []
-            
-            tags = tree_data.get("tags", [])
-            self.current_body_structure[parent_key].append({"name": new_name, "tags": tags})
-            
-            # Добавляем новое имя в посещенные
-            visited.add(new_name)
-            
-            if "children" in tree_data:
-                for child in tree_data["children"]:
-                    add_tree_recursive(child, new_name, visited.copy())
-        
         def confirm():
             sel = templates_listbox.curselection()
             if not sel:
@@ -2184,9 +2107,9 @@ class BodyTypeManager:
                 if "Body" not in self.current_body_structure:
                     self.current_body_structure["Body"] = []
             
-            # Добавляем дерево
+            # Добавляем дерево используя общую рекурсивную функцию
             tree_data = template_data["tree_data"]
-            add_tree_recursive(tree_data, parent_name)
+            self._add_tree_to_body_recursive(tree_data, parent_name)
             
             # Сохраняем состояние для Undo
             self._save_action_state("paste_tree", {
