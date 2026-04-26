@@ -6,7 +6,7 @@ import json
 from core.character import Character
 from core.module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
 from core.body_types.body_classes import AbstractBody
-from modules import BaseComponent
+from core.components import BaseComponent
 
 class MainWindow(tk.Tk):
     def __init__(self):
