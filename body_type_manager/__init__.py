@@ -4,6 +4,15 @@
 Инкапсулирует всю логику создания, редактирования, удаления и отображения типов тел.
 """
 
-from .core import BodyTypeManager
+# Импортируем классы тел отдельно - они не зависят от tkinter
+from .body_classes import AbstractBody, DynamicBody, generate_short_id
 
-__all__ = ['BodyTypeManager']
+# BodyTypeManager импортируем с задержкой или через getattr для избежания circular imports
+# и проблем с tkinter при импорте только классов тел
+__all__ = ['AbstractBody', 'DynamicBody', 'generate_short_id', 'BodyTypeManager']
+
+def __getattr__(name):
+    if name == 'BodyTypeManager':
+        from .core import BodyTypeManager
+        return BodyTypeManager
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
