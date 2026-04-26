@@ -1,5 +1,5 @@
 # file: traits_system_component.py
-from components import BaseComponent
+from core.components import BaseComponent
 
 class Traits_system(BaseComponent):
     def __init__(self, placeholder_param="default_value"):

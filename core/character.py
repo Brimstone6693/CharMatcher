@@ -1,6 +1,6 @@
 # file: character.py
-from body import AbstractBody
-from components import BaseComponent
+from core.body_types.body_classes import AbstractBody
+from core.components import BaseComponent
 
 class Character:
     def __init__(self, name="Unnamed", body: AbstractBody = None):

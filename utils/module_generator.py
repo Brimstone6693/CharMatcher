@@ -3,7 +3,7 @@ import os
 
 # Шаблоны для генерации
 COMPONENT_TEMPLATE = '''# file: {filename}
-from components import BaseComponent
+from core.components import BaseComponent
 
 class {class_name}(BaseComponent):
     def __init__(self, placeholder_param="default_value"):
@@ -36,7 +36,7 @@ class {class_name}(BaseComponent):
 '''
 
 BODY_TEMPLATE = '''# file: {filename}
-from body import AbstractBody
+from core.body_types.body_classes import AbstractBody
 
 class {class_name}(AbstractBody):
     def __init__(self, race="Custom_{class_name_base}", size="Medium", gender="N/A", **kwargs):

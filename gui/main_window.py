@@ -3,10 +3,10 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
 import json
-from character import Character
-from module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
-from body_type_manager import AbstractBody
-from components import BaseComponent
+from core.character import Character
+from core.module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
+from core.body_types.body_classes import AbstractBody
+from modules import BaseComponent
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -240,7 +240,7 @@ class MainWindow(tk.Tk):
         """Показывает экран управления типами тел (добавление новых)."""
         # Делегируем создание экрана менеджеру типов тел
         if not hasattr(self, 'body_manager'):
-            from body_type_manager import BodyTypeManager
+            from core.body_types.core import BodyTypeManager
             self.body_manager = BodyTypeManager(self)
         
         self.body_manager.create_manage_bodies_screen()
