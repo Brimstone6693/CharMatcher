@@ -6,24 +6,24 @@
     "display_name": "Humanoid",
     "description_template": "A {size} {gender} {race} with a humanoid body.",
     "body_structure": {
-        "None": [
-            {"name": "head", "tags": []},
-            {"name": "torso", "tags": []},
-            {"name": "left_arm", "tags": []},
-            {"name": "right_arm", "tags": []},
-            {"name": "left_leg", "tags": []},
-            {"name": "right_leg", "tags": []}
+        "null": [
+            {"part_id": "head0001", "name": "head", "tags": []},
+            {"part_id": "torso001", "name": "torso", "tags": []},
+            {"part_id": "larm0001", "name": "left_arm", "tags": []},
+            {"part_id": "rarm0001", "name": "right_arm", "tags": []},
+            {"part_id": "lleg0001", "name": "left_leg", "tags": []},
+            {"part_id": "rleg0001", "name": "right_leg", "tags": []}
         ],
-        "head": [
-            {"name": "eyes", "tags": []},
-            {"name": "ears", "tags": []},
-            {"name": "mouth", "tags": []},
-            {"name": "nose", "tags": []}
+        "head0001": [
+            {"part_id": "eyes0001", "name": "eyes", "tags": ["sensory"]},
+            {"part_id": "ears0001", "name": "ears", "tags": ["sensory"]},
+            {"part_id": "mouth001", "name": "mouth", "tags": []},
+            {"part_id": "nose0001", "name": "nose", "tags": ["sensory"]}
         ],
-        "mouth": [
-            {"name": "teeth", "tags": []},
-            {"name": "tongue", "tags": []}
+        "mouth001": [
+            {"part_id": "teeth001", "name": "teeth", "tags": []},
+            {"part_id": "tongue01", "name": "tongue", "tags": []}
         ],
-        "torso": []
+        "torso001": []
     }
 }
