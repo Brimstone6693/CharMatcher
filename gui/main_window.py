@@ -14,8 +14,8 @@ class MainWindow(tk.Tk):
         self.title("Character Creator GUI")
         self.geometry("600x400")
 
-        # Загружаем модули при старте приложения
-        self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")
+        # Загружаем модули при старте приложения (используем пути по умолчанию относительно корня проекта)
+        self.available_components, self.available_bodies = load_available_modules_and_bodies()
         print(f"GUI: Loaded {len(self.available_components)} components: {list(self.available_components.keys())}")
         print(f"GUI: Loaded {len(self.available_bodies)} bodies: {list(self.available_bodies.keys())}")
 
