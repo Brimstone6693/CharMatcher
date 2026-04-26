@@ -147,3 +147,80 @@ class AbstractBody:
         body.body_structure = data.get("body_structure", {})
         body._rebuild_name_cache()
         return body
+
+
+class DynamicBody(AbstractBody):
+    """Класс для динамической загрузки тел из JSON файлов."""
+    
+    def __init__(self, race="Unknown", size="Medium", gender="N/A", display_name="Unknown", description_template=None, **kwargs):
+        super().__init__(race, size)
+        self.gender = gender
+        self.display_name = display_name
+        self.description_template = description_template
+        # body_structure будет установлен через from_dict
+    
+    def describe_appearance(self):
+        if self.description_template:
+            try:
+                return self.description_template.format(size=self.size, gender=self.gender, race=self.race, display_name=self.display_name)
+            except KeyError:
+                return f"A {self.size} {self.gender} {self.display_name}."
+        return f"A {self.size} {self.gender} {self.display_name}."
+    
+    @classmethod
+    def from_dict(cls, data):
+        """Создает экземпляр DynamicBody из словаря данных JSON."""
+        instance = cls(
+            race=data.get("race", "Unknown"),
+            size=data.get("size", "Medium"),
+            gender=data.get("gender", "N/A"),
+            display_name=data.get("display_name", "Unknown"),
+            description_template=data.get("description_template")
+        )
+        if "body_structure" in data:
+            raw_structure = data["body_structure"]
+            # Конвертируем ключ "null" или "None" из строки обратно в None
+            for null_key in ["null", "None"]:
+                if null_key in raw_structure:
+                    raw_structure[None] = raw_structure.pop(null_key)
+                    break
+            
+            # Нормализуем все части в списках до словарей {part_id, name, tags}
+            normalized_structure = {}
+            for key, parts_list in raw_structure.items():
+                normalized_list = []
+                for item in parts_list:
+                    if isinstance(item, str):
+                        # Старый формат без ID - генерируем новый
+                        normalized_list.append({"part_id": generate_short_id(), "name": item, "tags": []})
+                    elif isinstance(item, dict) and "name" in item:
+                        # Поддерживаем оба формата: с part_id и без
+                        normalized_item = {
+                            "part_id": item.get("part_id", generate_short_id()),
+                            "name": item["name"],
+                            "tags": list(item.get("tags", []))
+                        }
+                        normalized_list.append(normalized_item)
+                    else:
+                        normalized_list.append(item)
+                normalized_structure[key] = normalized_list
+
+            instance.body_structure = normalized_structure
+            instance._rebuild_name_cache()
+        return instance
+
+    def to_dict(self):
+        """Сериализует тело в словарь для сохранения в JSON."""
+        base_dict = super().to_dict()
+        base_dict.update({
+            "gender": self.gender,
+            "display_name": self.display_name,
+            "description_template": self.description_template,
+            "class_name": self.__class__.__name__
+        })
+        # Конвертируем ключ None в строку "null" для JSON совместимости
+        if None in base_dict.get("body_structure", {}):
+            base_dict["body_structure"]["null"] = base_dict["body_structure"].pop(None)
+        # Удаляем type так как мы используем class_name для JSON
+        base_dict.pop("type", None)
+        return base_dict
