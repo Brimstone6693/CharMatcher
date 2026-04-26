@@ -106,7 +106,3 @@ class BodyTypeManager(
         
         # Загружаем доступные модули и тела
         self._reload_available_bodies()
-    
-    def _reload_available_bodies(self):
-        """Перезагружает список доступных компонентов и тел."""
-        self.available_components, self.available_bodies = load_available_modules_and_bodies("modules", "bodies")

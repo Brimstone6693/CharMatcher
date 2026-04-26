@@ -350,6 +350,9 @@ class TreeOperationsMixin:
                 # Получаем имя части
                 part_name = tree.item(item, "text").split(" [")[0]
                 
+                # Сохраняем состояние для Undo
+                self._save_action_state("edit_tags", {"part_name": part_name, "old_tags": self._get_part_tags(part_name), "new_tags": new_tags})
+                
                 # Обновляем теги в структуре
                 self._update_part_tags(part_name, new_tags)
                 
@@ -358,6 +361,18 @@ class TreeOperationsMixin:
             
             tags_entry.bind("<Return>", save_tags)
             tags_entry.bind("<Escape>", lambda e: tags_entry.destroy())
+    
+    def _get_part_tags(self, part_name):
+        """Получает текущие теги указанной части."""
+        for key, children in self.current_body_structure.items():
+            for child in children:
+                child_name = child["name"] if isinstance(child, dict) else child
+                if child_name == part_name:
+                    if isinstance(child, dict):
+                        return child.get("tags", [])
+                    else:
+                        return []
+        return []
     
     def _update_part_tags(self, part_name, new_tags):
         """Обновляет теги указанной части."""
@@ -519,18 +534,13 @@ class TreeOperationsMixin:
         part_name = self.body_parts_tree.item(item, "text").split(" [")[0]
         
         # Получаем текущие теги
-        current_tags = []
-        for key, children in self.current_body_structure.items():
-            for child in children:
-                child_name = child["name"] if isinstance(child, dict) else child
-                if child_name == part_name:
-                    if isinstance(child, dict):
-                        current_tags = child.get("tags", [])
-                    break
+        current_tags = self._get_part_tags(part_name)
         
         # Добавляем тег если его еще нет
         if tag_name not in current_tags:
             new_tags = current_tags + [tag_name]
+            # Сохраняем состояние для Undo
+            self._save_action_state("edit_tags", {"part_name": part_name, "old_tags": current_tags, "new_tags": new_tags})
             self._update_part_tags(part_name, new_tags)
             self.update_body_parts_tree()
     
