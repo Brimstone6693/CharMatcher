@@ -181,12 +181,21 @@ class DatabaseOperationsMixin:
                 return
             
             # Формируем структуру дерева
-            def build_tree_dict(part_name):
+            def build_tree_dict(part_name, visited=None):
+                if visited is None:
+                    visited = set()
+                
+                # Detect cycles to prevent infinite recursion
+                if part_name in visited:
+                    return {"name": part_name, "children": [], "_cycle_detected": True}
+                
+                visited.add(part_name)
+                
                 result = {"name": part_name, "children": []}
                 children = self.current_body_structure.get(part_name, [])
                 for child in children:
                     child_name = child["name"] if isinstance(child, dict) else child
-                    result["children"].append(build_tree_dict(child_name))
+                    result["children"].append(build_tree_dict(child_name, visited.copy()))
                 return result
             
             # Если есть выделение, сохраняем только поддерево
