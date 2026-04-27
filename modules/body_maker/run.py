@@ -29,8 +29,11 @@ class BodyMakerApp(tk.Tk):
         # Создаем главное окно и передаем его в BodyTypeManager
         self.body_manager = BodyTypeManager(self)
         
-        # Инициализируем UI
+        # Инициализируем UI главного окна (создаем виджеты listbox и другие)
         self._setup_ui()
+        
+        # После создания всех виджетов создаем экран управления телами
+        self.body_manager.create_manage_bodies_screen()
     
     def _setup_ui(self):
         """Настраивает основной интерфейс приложения."""
@@ -118,25 +121,26 @@ class BodyMakerApp(tk.Tk):
     
     def _on_create_body_clicked(self):
         """Обработчик кнопки создания нового типа тела."""
-        # Вызываем new_body для сброса формы, затем показываем экран управления
+        # Сбрасываем форму для нового тела
         self.body_manager.new_body()
-        # Проверяем есть ли уже экран управления, если нет - создаем
-        if not hasattr(self.body_manager, 'body_parts_tree') or self.body_manager.body_parts_tree is None:
-            self.body_manager.create_manage_bodies_screen()
     
     def _on_load_body_clicked(self):
         """Обработчик кнопки загрузки существующего типа тела."""
-        selection = self.bodies_listbox.curselection()
-        if not selection:
-            messagebox.showwarning("Предупреждение", "Выберите тип тела из списка.")
+        # Проверяем, существует ли виджет listbox
+        if not hasattr(self, 'bodies_listbox') or self.bodies_listbox is None:
             return
-        
-        # Проверяем есть ли уже экран управления, если нет - создаем
-        if not hasattr(self.body_manager, 'body_parts_tree') or self.body_manager.body_parts_tree is None:
-            self.body_manager.create_manage_bodies_screen()
-        
-        body_name = self.bodies_listbox.get(selection[0])
-        self.body_manager.on_load_body_to_editor()
+            
+        try:
+            selection = self.bodies_listbox.curselection()
+            if not selection:
+                messagebox.showwarning("Предупреждение", "Выберите тип тела из списка.")
+                return
+            
+            body_name = self.bodies_listbox.get(selection[0])
+            self.body_manager.on_load_body_to_editor()
+        except tk.TclError:
+            # Виджет был уничтожен, игнорируем ошибку
+            return
     
     def _on_edit_body_clicked(self):
         """Обработчик редактирования типа тела."""
