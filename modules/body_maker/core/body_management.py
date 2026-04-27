@@ -43,9 +43,9 @@ class BodyManagementMixin:
                         print(f"  Error loading body JSON {filename}: {e}")
     
     def show_start_screen(self):
-        """Возвращает к начальному экрану (делегирование родительскому окну)."""
-        if hasattr(self.parent, 'show_start_screen'):
-            self.parent.show_start_screen()
+        """Возвращает к экрану управления телами (делегирование родительскому окну)."""
+        if hasattr(self.parent, 'create_manage_bodies_screen'):
+            self.parent.create_manage_bodies_screen()
     
     def init_body_structure_with_root(self):
         """Инициализирует структуру тела с обязательной корневой частью 'Body'."""
@@ -107,10 +107,12 @@ class BodyManagementMixin:
     
     def get_final_gender(self):
         """Возвращает итоговое значение пола с учётом custom поля."""
-        from modules.body_maker.core.gender_utils import get_final_gender_value
         base_gender = self.new_body_gender_var.get()
         custom_gender = self.new_body_gender_custom_entry.get().strip()
-        return get_final_gender_value(base_gender, custom_gender)
+        
+        if base_gender == "Other" and custom_gender:
+            return custom_gender
+        return base_gender if base_gender else "N/A"
     
     def new_body(self):
         """Создает новое тело (сбрасывает текущую структуру)"""
@@ -187,11 +189,20 @@ class BodyManagementMixin:
     
     def on_load_body_to_editor(self):
         """Загружает выбранный тип тела в редактор для просмотра/редактирования."""
-        selection = self.bodies_listbox.curselection()
-        if not selection:
+        # Проверяем, существует ли виджет listbox
+        if not hasattr(self, 'bodies_listbox') or self.bodies_listbox is None:
+            return
+            
+        try:
+            selection = self.bodies_listbox.curselection()
+            if not selection:
+                return
+            
+            body_name = self.bodies_listbox.get(selection[0])
+        except tk.TclError:
+            # Виджет был уничтожен, игнорируем ошибку
             return
         
-        body_name = self.bodies_listbox.get(selection[0])
         # Получаем путь к файлу тела (JSON)
         filename = f"{body_name.lower()}.json"
         filepath = os.path.join(BODIES_DATA_DIR, filename)
@@ -272,6 +283,7 @@ class BodyManagementMixin:
                         normalized_children.append(normalized)
                 self.current_body_structure[parent_key] = normalized_children
             
+            # Обновляем дерево частей тела
             self.update_body_parts_tree()
             self.update_auto_size()
             
