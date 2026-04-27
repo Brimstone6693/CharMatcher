@@ -4,9 +4,39 @@
     "category": "External",
     "description": ""
   },
-  "ddd": {
-    "name": "ddd",
-    "category": "d",
+  "Vital": {
+    "name": "Vital",
+    "category": "Bio",
+    "description": ""
+  },
+  "Sight": {
+    "name": "Sight",
+    "category": "Sensory",
+    "description": ""
+  },
+  "Organic": {
+    "name": "Organic",
+    "category": "Origin",
+    "description": ""
+  },
+  "Limb": {
+    "name": "Limb",
+    "category": "Meta",
+    "description": ""
+  },
+  "Manipulation": {
+    "name": "Manipulation",
+    "category": "Meta",
+    "description": ""
+  },
+  "Walking": {
+    "name": "Walking",
+    "category": "Meta",
+    "description": ""
+  },
+  "Flight": {
+    "name": "Flight",
+    "category": "Meta",
     "description": ""
   }
 }

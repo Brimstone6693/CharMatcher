@@ -113,6 +113,56 @@
       },
       "description": "Test creature template",
       "part_count": 7
+    },
+    {
+      "id": 2,
+      "name": "HumanoidHeadTemplate01",
+      "tree_data": {
+        "name": "Head",
+        "children": [
+          {
+            "name": "L_eye",
+            "children": []
+          },
+          {
+            "name": "R_eye",
+            "children": []
+          }
+        ]
+      },
+      "description": "",
+      "part_count": 3
+    },
+    {
+      "id": 3,
+      "name": "HumanoidHeadTemplate02",
+      "tree_data": {
+        "name": "Head",
+        "tags": [
+          "Vital",
+          "Organic"
+        ],
+        "children": [
+          {
+            "name": "L_eye",
+            "tags": [
+              "Sight",
+              "Organic"
+            ],
+            "children": []
+          },
+          {
+            "name": "R_eye",
+            "tags": [
+              "Sight",
+              "Organic"
+            ],
+            "children": []
+          }
+        ]
+      },
+      "description": "",
+      "part_count": 3
     }
   ]
 }
