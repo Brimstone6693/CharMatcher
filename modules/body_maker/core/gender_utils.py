@@ -1,7 +1,14 @@
 # file: modules/body_maker/core/gender_utils.py
 """
-Миксин для утилит работы с полом персонажей.
+Утилиты для работы с полом персонажей.
 """
+
+
+def get_final_gender_value(base_gender: str, custom_gender: str) -> str:
+    """Возвращает итоговое значение пола с учётом custom поля."""
+    if base_gender == "Other" and custom_gender:
+        return custom_gender
+    return base_gender if base_gender else "N/A"
 
 
 class GenderUtilsMixin:
