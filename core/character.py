@@ -1,5 +1,5 @@
 # file: character.py
-from core.body_types.body_classes import AbstractBody
+from modules.body_maker.core.body_classes import AbstractBody
 from core.components import BaseComponent
 
 class Character:

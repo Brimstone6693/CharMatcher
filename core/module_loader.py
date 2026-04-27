@@ -3,12 +3,12 @@ import os
 import importlib.util
 import json
 from core.components import BaseComponent
-from core.body_types.body_classes import AbstractBody, DynamicBody # Импортируем базовый класс тела и динамический класс
+from modules.body_maker.core.body_classes import AbstractBody, DynamicBody # Импортируем базовый класс тела и динамический класс
 
 # Получаем директорию проекта (родительскую от директории этого файла)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODULES_DIR = os.path.join(PROJECT_ROOT, "modules")
-BODIES_DATA_DIR = os.path.join(PROJECT_ROOT, "bodies_data")
+from modules.body_maker.core.config import BODIES_DATA_DIR
 
 def load_available_modules_and_bodies(components_dir=None, bodies_dir=None):
     """
