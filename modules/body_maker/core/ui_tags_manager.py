@@ -27,11 +27,11 @@ class TagsManagerMixin:
             # Если фрейм уже создан, просто показываем его
             self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
             # Скрываем список частей если он был виден (только одна вкладка активна)
-            if self.parts_list_visible:
+            if self.parts_list_frame and self.parts_list_frame.winfo_viewable():
                 self.parts_list_frame.grid_remove()
             self.tags_manager_visible = True
-            self._update_left_panel_layout()
             self.toggle_tags_manager_btn.config(text="🏷️ Hide Tags")
+            self._update_left_panel_layout()
             self.update_tags_manager_tree()
             return
         
@@ -83,6 +83,7 @@ class TagsManagerMixin:
         
         self.tags_manager_visible = True
         self.toggle_tags_manager_btn.config(text="🏷️ Hide Tags")
+        self._update_left_panel_layout()
     
     def hide_tags_manager(self):
         """Скрывает панель менеджера тегов."""
@@ -107,8 +108,16 @@ class TagsManagerMixin:
         self.left_panel_container.grid_rowconfigure(0, weight=0)
         self.left_panel_container.grid_rowconfigure(1, weight=0)
         
+        # Определяем какие элементы фактически видны (не скрыты через grid_remove)
+        parts_list_is_visible = (self.parts_list_visible and 
+                                  self.parts_list_frame is not None and 
+                                  self.parts_list_frame.winfo_viewable())
+        tags_manager_is_visible = (self.tags_manager_visible and 
+                                    self.tags_manager_frame is not None and 
+                                    self.tags_manager_frame.winfo_viewable())
+        
         # Если оба элемента видны, показываем их один под другим с равным весом
-        if self.parts_list_visible and self.tags_manager_visible:
+        if parts_list_is_visible and tags_manager_is_visible:
             self.left_panel_container.grid_rowconfigure(0, weight=1)
             self.left_panel_container.grid_rowconfigure(1, weight=1)
             if self.parts_list_frame:
@@ -116,19 +125,22 @@ class TagsManagerMixin:
             if self.tags_manager_frame:
                 self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
         # Если только список частей виден - он занимает всё пространство
-        elif self.parts_list_visible and not self.tags_manager_visible:
+        elif parts_list_is_visible and not tags_manager_is_visible:
             self.left_panel_container.grid_rowconfigure(0, weight=1)
             if self.parts_list_frame:
                 self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
             if self.tags_manager_frame:
                 self.tags_manager_frame.grid_remove()
         # Если только теги видны - они занимают всё пространство
-        elif not self.parts_list_visible and self.tags_manager_visible:
+        elif not parts_list_is_visible and tags_manager_is_visible:
             self.left_panel_container.grid_rowconfigure(0, weight=1)
             if self.parts_list_frame:
                 self.parts_list_frame.grid_remove()
             if self.tags_manager_frame:
                 self.tags_manager_frame.grid(row=0, column=0, sticky="nsew")
+        # Если ничего не видно - скрываем контейнер
+        else:
+            self.left_panel_container.grid_remove()
     
     def update_tags_manager_tree(self):
         """Обновляет дерево менеджера тегов."""
