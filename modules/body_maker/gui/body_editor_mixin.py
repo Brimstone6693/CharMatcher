@@ -1,10 +1,12 @@
-# file: gui/mixins/body_editor_mixin.py
+# file: modules/body_maker/gui/body_editor_mixin.py
 """Mixin for body editor integration functionality."""
 import tkinter as tk
 from tkinter import ttk, messagebox
 import os
 import json
-from core.module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
+
+# Обновленные импорты для новой структуры
+from modules.body_maker.core.body_management import load_available_modules_and_bodies, BODIES_DATA_DIR
 
 
 class BodyEditorMixin:
@@ -12,7 +14,7 @@ class BodyEditorMixin:
     
     def show_manage_bodies_screen(self):
         """Shows the body types management screen."""
-        from core.body_types.core import BodyTypeManager
+        from modules.body_maker.core.core import BodyTypeManager
         if not hasattr(self, 'body_manager'):
             self.body_manager = BodyTypeManager(self)
         
@@ -69,7 +71,7 @@ class BodyEditorMixin:
 
     def update_body_parts_tree(self):
         """Updates body parts tree based on current_body_structure with expanded state preservation."""
-        from core.body_types.tree_operations import update_tree_from_structure
+        from modules.body_maker.core.tree_operations import update_tree_from_structure
         update_tree_from_structure(
             self.body_parts_tree, 
             self.current_body_structure
@@ -77,22 +79,22 @@ class BodyEditorMixin:
 
     def on_add_root_part(self):
         """Adds a root body part (to key None)."""
-        from core.body_types.tree_editing import add_root_part_dialog
+        from modules.body_maker.core.tree_editing import add_root_part_dialog
         add_root_part_dialog(self, self.current_body_structure, self.update_body_parts_tree)
 
     def on_add_child_part(self):
         """Adds a child part to selected nodes (supports multiple selection)."""
-        from core.body_types.tree_editing import add_child_part_dialog
+        from modules.body_maker.core.tree_editing import add_child_part_dialog
         add_child_part_dialog(self, self.body_parts_tree, self.current_body_structure, self.update_body_parts_tree)
 
     def on_delete_part(self):
         """Deletes selected part and all its descendants."""
-        from core.body_types.tree_editing import delete_part_dialog
+        from modules.body_maker.core.tree_editing import delete_part_dialog
         delete_part_dialog(self, self.body_parts_tree, self.current_body_structure, self.update_body_parts_tree)
 
     def on_rename_part(self):
         """Renames selected part."""
-        from core.body_types.tree_editing import rename_part_dialog
+        from modules.body_maker.core.tree_editing import rename_part_dialog
         rename_part_dialog(self, self.body_parts_tree, self.current_body_structure, 
                           self.get_all_part_names_from_structure, self.update_body_parts_tree)
 
@@ -106,7 +108,7 @@ class BodyEditorMixin:
 
     def on_create_body_type_clicked(self):
         """Handler for creating new body type through interface."""
-        from core.body_types.body_crud import create_new_body_type
+        from modules.body_maker.core.body_management import create_new_body_type
         create_new_body_type(
             main_window=self,
             class_name_entry=self.new_body_class_name_entry,
@@ -139,7 +141,7 @@ class BodyEditorMixin:
 
     def on_load_body_to_editor(self):
         """Loads selected body type into editor for viewing/editing."""
-        from core.body_types.body_crud import load_body_to_editor
+        from modules.body_maker.core.body_management import load_body_to_editor
         load_body_to_editor(
             bodies_listbox=self.bodies_listbox,
             class_name_entry=self.new_body_class_name_entry,
@@ -156,7 +158,7 @@ class BodyEditorMixin:
 
     def on_rename_body_type(self):
         """Renames selected body type (creates copy with new name and deletes old)."""
-        from core.body_types.body_crud import rename_body_type_dialog
+        from modules.body_maker.core.body_management import rename_body_type_dialog
         rename_body_type_dialog(
             main_window=self,
             bodies_listbox=self.bodies_listbox,
@@ -166,7 +168,7 @@ class BodyEditorMixin:
 
     def on_copy_body_type(self):
         """Copies selected body type with new name."""
-        from core.body_types.body_crud import copy_body_type_dialog
+        from modules.body_maker.core.body_management import copy_body_type_dialog
         copy_body_type_dialog(
             main_window=self,
             bodies_listbox=self.bodies_listbox,
@@ -176,7 +178,7 @@ class BodyEditorMixin:
 
     def on_delete_body_type(self):
         """Deletes selected body type."""
-        from core.body_types.body_crud import delete_body_type_dialog
+        from modules.body_maker.core.body_management import delete_body_type_dialog
         delete_body_type_dialog(
             main_window=self,
             bodies_listbox=self.bodies_listbox,

@@ -1,4 +1,4 @@
-# file: body_type_manager/body_management.py
+# file: modules/body_maker/core/body_management.py
 """
 Миксин для управления типами тел (создание, сохранение, загрузка, удаление).
 """
@@ -8,6 +8,8 @@ import json
 import uuid
 import tkinter as tk
 from tkinter import messagebox, ttk
+
+# Обновленные импорты для новой структуры
 from core.module_loader import BODIES_DATA_DIR, load_available_modules_and_bodies
 
 
