@@ -141,7 +141,7 @@ class PartsListMixin:
             tree_selection = self.body_parts_tree.selection()
             if tree_selection:
                 parent_item = tree_selection[0]
-                parent_name = self.body_parts_tree.item(parent_item, "text")
+                parent_name = self.body_parts_tree.item(parent_item, "text").split(" [")[0]  # Убираем теги из имени
             else:
                 # Если нет выделения, добавляем к Body (как в on_load_tree_from_db)
                 parent_name = "Body"
@@ -175,7 +175,7 @@ class PartsListMixin:
             tree_selection = self.body_parts_tree.selection()
             if tree_selection:
                 parent_item = tree_selection[0]
-                parent_name = self.body_parts_tree.item(parent_item, "text")
+                parent_name = self.body_parts_tree.item(parent_item, "text").split(" [")[0]  # Убираем теги из имени
             else:
                 # Если нет выделения, добавляем к Body
                 parent_name = "Body"

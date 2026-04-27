@@ -71,7 +71,7 @@ class DatabaseOperationsMixin:
             return
         
         parent_item = selection[0]
-        parent_name = self.body_parts_tree.item(parent_item, "text")
+        parent_name = self.body_parts_tree.item(parent_item, "text").split(" [")[0]  # Убираем теги из имени
         
         # Диалог выбора части из базы
         dialog = tk.Toplevel(self.parent)
@@ -187,11 +187,20 @@ class DatabaseOperationsMixin:
                 
                 # Detect cycles to prevent infinite recursion
                 if part_name in visited:
-                    return {"name": part_name, "children": [], "_cycle_detected": True}
+                    return {"name": part_name, "tags": [], "children": [], "_cycle_detected": True}
                 
                 visited.add(part_name)
                 
-                result = {"name": part_name, "children": []}
+                # Извлекаем теги части
+                tags = []
+                for parent_key, children in self.current_body_structure.items():
+                    for child in children:
+                        child_name = child["name"] if isinstance(child, dict) else child
+                        if child_name == part_name and isinstance(child, dict):
+                            tags = child.get("tags", [])
+                            break
+                
+                result = {"name": part_name, "tags": tags, "children": []}
                 children = self.current_body_structure.get(part_name, [])
                 for child in children:
                     child_name = child["name"] if isinstance(child, dict) else child
@@ -201,7 +210,7 @@ class DatabaseOperationsMixin:
             # Если есть выделение, сохраняем только поддерево
             if selection:
                 item = selection[0]
-                root_name = self.body_parts_tree.item(item, "text")
+                root_name = self.body_parts_tree.item(item, "text").split(" [")[0]  # Убираем теги из имени
                 tree_data = build_tree_dict(root_name)
             else:
                 # Сохраняем всё дерево от корня
@@ -282,7 +291,7 @@ class DatabaseOperationsMixin:
             selection = self.body_parts_tree.selection()
             if selection:
                 parent_item = selection[0]
-                parent_name = self.body_parts_tree.item(parent_item, "text")
+                parent_name = self.body_parts_tree.item(parent_item, "text").split(" [")[0]  # Убираем теги из имени
             else:
                 # Если нет выделения, добавляем к Body
                 parent_name = "Body"
@@ -311,6 +320,7 @@ class DatabaseOperationsMixin:
     def _add_tree_to_body_recursive(self, tree_data, parent_key, visited=None):
         """
         Рекурсивно добавляет части дерева с защитой от дублирования имен и генерацией новых ID.
+        Сохраняет теги из загружаемого дерева.
         """
         import uuid
         
@@ -335,6 +345,7 @@ class DatabaseOperationsMixin:
         if parent_key not in self.current_body_structure:
             self.current_body_structure[parent_key] = []
         
+        # Извлекаем теги из tree_data (сохраняются при загрузке из базы)
         tags = tree_data.get("tags", [])
         # Генерируем новый уникальный ID для добавляемой части
         new_part_id = str(uuid.uuid4())
