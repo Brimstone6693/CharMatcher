@@ -141,6 +141,31 @@ class TreeClipboardMixin:
             self._update_part_tags(part_name, new_tags)
             self.update_body_parts_tree()
     
+    def _get_part_tags(self, part_name):
+        """Получает текущие теги указанной части."""
+        for key, children in self.current_body_structure.items():
+            for child in children:
+                child_name = child["name"] if isinstance(child, dict) else child
+                if child_name == part_name:
+                    if isinstance(child, dict):
+                        return child.get("tags", [])
+                    else:
+                        return []
+        return []
+    
+    def _update_part_tags(self, part_name, new_tags):
+        """Обновляет теги указанной части."""
+        for key, children in self.current_body_structure.items():
+            for i, child in enumerate(children):
+                child_name = child["name"] if isinstance(child, dict) else child
+                if child_name == part_name:
+                    if isinstance(child, dict):
+                        self.current_body_structure[key][i]["tags"] = new_tags
+                    else:
+                        # Преобразуем строку в словарь с тегами
+                        self.current_body_structure[key][i] = {"name": child_name, "tags": new_tags}
+                    return
+    
     def _update_add_tag_menu(self):
         """Обновляет подменю для добавления тегов."""
         import tkinter as tk

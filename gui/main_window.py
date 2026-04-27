@@ -7,8 +7,18 @@ from core.character import Character
 from core.module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
 from core.body_types.body_classes import AbstractBody
 from core.components import BaseComponent
+from gui.mixins.start_screen_mixin import StartScreenMixin
+from gui.mixins.creation_screen_mixin import CreationScreenMixin
+from gui.mixins.character_view_mixin import CharacterViewMixin
+from gui.mixins.body_editor_mixin import BodyEditorMixin
 
-class MainWindow(tk.Tk):
+class MainWindow(
+    tk.Tk,
+    StartScreenMixin,
+    CreationScreenMixin,
+    CharacterViewMixin,
+    BodyEditorMixin
+):
     def __init__(self):
         super().__init__()
         self.title("Character Creator GUI")

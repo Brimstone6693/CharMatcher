@@ -16,6 +16,8 @@ from .ui_structure import UIStructureMixin
 from .ui_parts_list import PartsListMixin
 from .ui_tags_manager import TagsManagerMixin
 from .tree_operations import TreeOperationsMixin
+from .tree_editing import TreeEditingMixin
+from .tree_clipboard import TreeClipboardMixin
 from .database_operations import DatabaseOperationsMixin
 from .body_management import BodyManagementMixin
 from .history import HistoryMixin
@@ -24,6 +26,8 @@ from .history import HistoryMixin
 class BodyTypeManager(
     HistoryMixin,
     TreeOperationsMixin, 
+    TreeEditingMixin,
+    TreeClipboardMixin,
     PartsListMixin,
     TagsManagerMixin,
     DatabaseOperationsMixin,
