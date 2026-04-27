@@ -26,11 +26,11 @@ class PartsListMixin:
             # Если фрейм уже создан, просто показываем его
             self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
             # Скрываем теги если они были видны (только одна вкладка активна)
-            if self.tags_manager_visible:
+            if self.tags_manager_frame and self.tags_manager_frame.winfo_viewable():
                 self.tags_manager_frame.grid_remove()
             self.parts_list_visible = True
-            self._update_left_panel_layout()
             self.toggle_parts_list_btn.config(text="📋 Hide List")
+            self._update_left_panel_layout()
             self.update_parts_list_tree()  # Обновляем данные при каждом показе
             return
         
@@ -72,6 +72,7 @@ class PartsListMixin:
         
         self.parts_list_visible = True
         self.toggle_parts_list_btn.config(text="📋 Hide List")
+        self._update_left_panel_layout()
     
     def hide_parts_list(self):
         """Скрывает панель списка частей тела."""
