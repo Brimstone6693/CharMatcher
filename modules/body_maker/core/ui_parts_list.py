@@ -24,12 +24,13 @@ class PartsListMixin:
         
         if self.parts_list_frame is not None:
             # Если фрейм уже создан, просто показываем его
-            self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
+            self.parts_list_visible = True
+            self.toggle_parts_list_btn.config(text="📋 Hide List")
             # Скрываем теги если они были видны (только одна вкладка активна)
             if self.tags_manager_frame and self.tags_manager_frame.winfo_viewable():
                 self.tags_manager_frame.grid_remove()
-            self.parts_list_visible = True
-            self.toggle_parts_list_btn.config(text="📋 Hide List")
+                self.tags_manager_visible = False
+                self.toggle_tags_manager_btn.config(text="🏷️ Tags")
             self._update_left_panel_layout()
             self.update_parts_list_tree()  # Обновляем данные при каждом показе
             return

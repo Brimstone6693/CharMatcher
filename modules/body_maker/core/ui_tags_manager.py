@@ -25,19 +25,20 @@ class TagsManagerMixin:
         
         if self.tags_manager_frame is not None:
             # Если фрейм уже создан, просто показываем его
-            self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
+            self.tags_manager_visible = True
+            self.toggle_tags_manager_btn.config(text="🏷️ Hide Tags")
             # Скрываем список частей если он был виден (только одна вкладка активна)
             if self.parts_list_frame and self.parts_list_frame.winfo_viewable():
                 self.parts_list_frame.grid_remove()
-            self.tags_manager_visible = True
-            self.toggle_tags_manager_btn.config(text="🏷️ Hide Tags")
+                self.parts_list_visible = False
+                self.toggle_parts_list_btn.config(text="📋 List")
             self._update_left_panel_layout()
             self.update_tags_manager_tree()
             return
         
         # Создаем новую панель для менеджера тегов в левом контейнере
         self.tags_manager_frame = ttk.LabelFrame(self.left_panel_container, text="Tags Manager (Drag & Drop to Tree)", padding=5)
-        self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
+        self.tags_manager_frame.grid(row=0, column=0, sticky="nsew")
         self.tags_manager_frame.grid_columnconfigure(0, weight=1)
         self.tags_manager_frame.grid_rowconfigure(0, weight=1)
         
