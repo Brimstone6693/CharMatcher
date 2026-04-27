@@ -7,9 +7,22 @@
 # Импортируем классы тел отдельно - они не зависят от tkinter
 from .body_classes import AbstractBody, DynamicBody, generate_short_id
 
+# Импортируем миксины
+from .tree_operations import TreeOperationsMixin
+from .tree_editing import TreeEditingMixin
+from .tree_clipboard import TreeClipboardMixin
+
 # BodyTypeManager импортируем с задержкой или через getattr для избежания circular imports
 # и проблем с tkinter при импорте только классов тел
-__all__ = ['AbstractBody', 'DynamicBody', 'generate_short_id', 'BodyTypeManager']
+__all__ = [
+    'AbstractBody', 
+    'DynamicBody', 
+    'generate_short_id', 
+    'BodyTypeManager',
+    'TreeOperationsMixin',
+    'TreeEditingMixin',
+    'TreeClipboardMixin',
+]
 
 def __getattr__(name):
     if name == 'BodyTypeManager':
