@@ -8,6 +8,7 @@ from core.gui.start_screen_mixin import StartScreenMixin
 from modules.body_maker.gui.creation_screen_mixin import CreationScreenMixin
 from core.gui.mixins.character_view_mixin import CharacterViewMixin
 from modules.body_maker.gui.body_editor_mixin import BodyEditorMixin
+from core.character import Character
 
 class MainWindow(
     tk.Tk,
@@ -27,8 +28,39 @@ class MainWindow(
         print(f"GUI: Loaded {len(self.available_bodies)} bodies: {list(self.available_bodies.keys())}")
 
         self.current_character = None # Для хранения текущего персонажа
+        
+        # Устанавливаем callback для создания персонажа из body_maker
+        self.on_character_created_callback = self._create_character_from_data
 
         self.show_start_screen()
+    
+    def _create_character_from_data(self, character_data):
+        """Создаёт персонажа из данных полученных от body_maker."""
+        name = character_data.get('name', 'Unknown')
+        body_dict = character_data.get('body', {})
+        components_list = character_data.get('components', [])
+        
+        # Создаём тело из словаря
+        from core.body_types.body_classes import DynamicBody
+        body = DynamicBody.from_dict(body_dict)
+        
+        # Создаём персонажа
+        self.current_character = Character(name=name, body=body)
+        
+        # Добавляем компоненты
+        for comp_info in components_list:
+            comp_type_name = comp_info.get('type')
+            comp_data = comp_info.get('data', {})
+            if comp_type_name and comp_type_name in self.available_components:
+                comp_class = self.available_components[comp_type_name]
+                comp_instance = comp_class()
+                # Если у компонента есть from_dict, используем его
+                if hasattr(comp_instance, 'from_dict'):
+                    comp_instance = comp_class.from_dict(comp_data)
+                self.current_character.add_component(comp_instance)
+        
+        print(f"MainWindow: Created character {self.current_character.name}")
+        return self.current_character
 
     def on_create_clicked(self):
         """Обработчик кнопки Create."""

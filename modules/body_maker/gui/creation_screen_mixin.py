@@ -87,24 +87,35 @@ class CreationScreenMixin:
         # Create body instance (with minimal parameters for example)
         body_instance = selected_body_class(race=selected_body_name.replace("Body", "").lower(), gender="N/A")
 
-        # Создаём персонажа и возвращаем его через callback
-        # Главный окно должно предоставить callback для создания персонажа
+        # Создаём данные персонажа как словарь и передаём через callback
+        # Это позволяет body_maker не зависеть от core.character
+        character_data = {
+            'name': name,
+            'body': body_instance.to_dict() if hasattr(body_instance, 'to_dict') else str(body_instance),
+            'components': []
+        }
+
+        # Add selected components - получаем компоненты из главного окна
+        available_components = getattr(self, 'available_components', {})
+        for comp_name, var in self.component_vars.items():
+            if var.get():
+                comp_class = available_components.get(comp_name)
+                if comp_class:
+                    comp_instance = comp_class()
+                    if hasattr(comp_instance, 'to_dict'):
+                        character_data['components'].append({
+                            'type': comp_class.__name__,
+                            'data': comp_instance.to_dict()
+                        })
+
+        # Передаём данные персонажа через callback главному окну
         if hasattr(self, 'on_character_created_callback'):
-            self.on_character_created_callback(name, body_instance)
+            self.on_character_created_callback(character_data)
         else:
-            # Fallback: создаём персонажа напрямую (требует импорта core)
-            from core.character import Character
-            self.current_character = Character(name=name, body=body_instance)
+            # Fallback: создаём персонажа через метод главного окна
+            if hasattr(self, '_create_character_from_data'):
+                self._create_character_from_data(character_data)
 
-            # Add selected components - получаем компоненты из главного окна
-            available_components = getattr(self, 'available_components', {})
-            for comp_name, var in self.component_vars.items():
-                if var.get():
-                    comp_class = available_components.get(comp_name)
-                    if comp_class:
-                        comp_instance = comp_class()
-                        self.current_character.add_component(comp_instance)
-
-        print(f"GUI: Created character {getattr(self, 'current_character', None).name if hasattr(self, 'current_character') else 'N/A'}")
+        print(f"GUI: Created character {name}")
         if hasattr(self, 'show_character_view'):
             self.show_character_view()
