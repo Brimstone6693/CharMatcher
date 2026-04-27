@@ -210,6 +210,61 @@ class TreeClipboardMixin:
         self.add_tag_menu.add_separator()
         self.add_tag_menu.add_command(label="➕ Create Custom Tag...", command=self.on_add_custom_tag)
     
+    def _update_remove_tag_menu(self):
+        """Обновляет подменю для удаления тегов."""
+        import tkinter as tk
+        
+        # Очищаем существующие пункты
+        self.remove_tag_menu.delete(0, 'end')
+        
+        # Получаем выбранную часть
+        selection = self.body_parts_tree.selection()
+        if not selection:
+            self.remove_tag_menu.add_command(label="No selection", state="disabled")
+            return
+        
+        item = selection[0]
+        part_name = self.body_parts_tree.item(item, "text").split(" [")[0]
+        
+        # Получаем текущие теги части
+        current_tags = self._get_part_tags(part_name)
+        
+        if not current_tags:
+            self.remove_tag_menu.add_command(label="No tags on this part", state="disabled")
+            return
+        
+        # Создаем пункты меню для каждого тега
+        for tag_name in current_tags:
+            self.remove_tag_menu.add_command(
+                label=tag_name,
+                command=lambda t=tag_name: self._remove_tag_from_selected_part(t)
+            )
+    
+    def _remove_tag_from_selected_part(self, tag_name):
+        """Удаляет указанный тег из выбранной части."""
+        selection = self.body_parts_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a part first.", parent=self.parent)
+            return
+        
+        item = selection[0]
+        part_name = self.body_parts_tree.item(item, "text").split(" [")[0]
+        
+        # Получаем текущие теги
+        current_tags = self._get_part_tags(part_name)
+        
+        # Удаляем тег если он есть
+        if tag_name in current_tags:
+            new_tags = [t for t in current_tags if t != tag_name]
+            # Сохраняем состояние для Undo
+            self._save_action_state("edit_tags", {
+                "part_name": part_name, 
+                "old_tags": current_tags, 
+                "new_tags": new_tags
+            })
+            self._update_part_tags(part_name, new_tags)
+            self.update_body_parts_tree()
+    
     def on_tree_right_click(self, event):
         """Обрабатывает правый клик по дереву частей тела."""
         import tkinter as tk
@@ -221,6 +276,7 @@ class TreeClipboardMixin:
         
         # Обновляем подменю тегов
         self._update_add_tag_menu()
+        self._update_remove_tag_menu()
         
         try:
             self.tree_menu.post(event.x_root, event.y_root)
