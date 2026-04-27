@@ -24,14 +24,13 @@ class PartsListMixin:
         
         if self.parts_list_frame is not None:
             # Если фрейм уже создан, просто показываем его
+            self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
+            # Скрываем теги если они были видны (только одна вкладка активна)
+            if self.tags_manager_visible:
+                self.tags_manager_frame.grid_remove()
+            self._update_left_panel_layout()
             self.parts_list_visible = True
             self.toggle_parts_list_btn.config(text="📋 Hide List")
-            # Скрываем теги если они были видны (только одна вкладка активна)
-            if self.tags_manager_frame and self.tags_manager_frame.winfo_viewable():
-                self.tags_manager_frame.grid_remove()
-                self.tags_manager_visible = False
-                self.toggle_tags_manager_btn.config(text="🏷️ Tags")
-            self._update_left_panel_layout()
             self.update_parts_list_tree()  # Обновляем данные при каждом показе
             return
         
@@ -40,9 +39,6 @@ class PartsListMixin:
         self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
         self.parts_list_frame.grid_columnconfigure(0, weight=1)
         self.parts_list_frame.grid_rowconfigure(0, weight=1)
-        
-        # Настраиваем веса строк контейнера сразу после создания
-        self.left_panel_container.grid_rowconfigure(0, weight=1)
         
         # Дерево со всеми частями (поддержка нескольких корневых узлов)
         columns = ("tags", "path")
@@ -73,7 +69,6 @@ class PartsListMixin:
         
         self.parts_list_visible = True
         self.toggle_parts_list_btn.config(text="📋 Hide List")
-        self._update_left_panel_layout()
     
     def hide_parts_list(self):
         """Скрывает панель списка частей тела."""
@@ -146,7 +141,7 @@ class PartsListMixin:
             tree_selection = self.body_parts_tree.selection()
             if tree_selection:
                 parent_item = tree_selection[0]
-                parent_name = self.body_parts_tree.item(parent_item, "text").split(" [")[0]  # Убираем теги из имени
+                parent_name = self.body_parts_tree.item(parent_item, "text")
             else:
                 # Если нет выделения, добавляем к Body (как в on_load_tree_from_db)
                 parent_name = "Body"
@@ -180,7 +175,7 @@ class PartsListMixin:
             tree_selection = self.body_parts_tree.selection()
             if tree_selection:
                 parent_item = tree_selection[0]
-                parent_name = self.body_parts_tree.item(parent_item, "text").split(" [")[0]  # Убираем теги из имени
+                parent_name = self.body_parts_tree.item(parent_item, "text")
             else:
                 # Если нет выделения, добавляем к Body
                 parent_name = "Body"

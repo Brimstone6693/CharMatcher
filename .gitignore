@@ -1,1 +1,1 @@
-Nothing should be ignored based on the provided file changes. The modified files are Python source files (.py) which should not be added to .gitignore according to the rules.
+Nothing should be ignored based on the provided file changes. The modified files (`modules/body_maker/core/ui_parts_list.py` and `modules/body_maker/core/ui_tags_manager.py`) are Python source code files, which should not be added to .gitignore.
