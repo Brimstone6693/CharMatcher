@@ -1,5 +1,10 @@
 # file: character.py
-from modules.body_maker.core.body_classes import AbstractBody
+"""
+Класс Character - центральный класс для управления персонажем.
+Использует компоненты и тело, предоставляя единый интерфейс.
+"""
+
+from core.body_types.body_classes import AbstractBody
 from core.components import BaseComponent
 
 class Character:

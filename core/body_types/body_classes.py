@@ -1,15 +1,10 @@
-# file: modules/body_maker/core/body_classes.py
+# file: core/body_types/body_classes.py
 """
-Классы тел для модуля Body Maker.
-Этот модуль полностью независим и не зависит от core.
+Базовые классы для системы тел.
+Эти классы находятся в core, чтобы модули могли зависеть от них.
 """
 
-import uuid
-
-
-def generate_short_id():
-    """Генерирует короткий уникальный ID."""
-    return str(uuid.uuid4())[:8]
+from core.utils import generate_short_id
 
 
 class AbstractBody:
@@ -28,7 +23,7 @@ class AbstractBody:
         """
         self.race = race
         self.size = size
-        self.body_structure = {}  # {parent_id: [{\"part_id\": id, \"name\": name, \"tags\": []}, ...]}
+        self.body_structure = {}  # {parent_id: [{"part_id": id, "name": name, "tags": []}, ...]}
         self._name_to_id_cache = {}
         self._id_to_part_cache = {}
     

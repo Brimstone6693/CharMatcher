@@ -33,7 +33,7 @@ class CreationScreenMixin:
         self.body_combo = ttk.Combobox(frame, textvariable=self.body_var, values=body_names, state="readonly")
         self.body_combo.pack(fill=tk.X, pady=(0, 10))
 
-        # Component selection
+        # Component selection - получаем компоненты из главного окна
         ttk.Label(frame, text="Select Components:").pack(anchor=tk.W)
         self.component_vars = {}
         comp_frame = ttk.Frame(frame)
@@ -51,7 +51,9 @@ class CreationScreenMixin:
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
-        for comp_name in self.available_components.keys():
+        # Используем available_components из главного окна (MainWindow)
+        available_components = getattr(self, 'available_components', {})
+        for comp_name in available_components.keys():
             var = tk.BooleanVar()
             chk = ttk.Checkbutton(scrollable_frame, text=comp_name, variable=var)
             chk.pack(anchor=tk.W)
@@ -85,16 +87,24 @@ class CreationScreenMixin:
         # Create body instance (with minimal parameters for example)
         body_instance = selected_body_class(race=selected_body_name.replace("Body", "").lower(), gender="N/A")
 
-        # Create character
-        from core.character import Character
-        self.current_character = Character(name=name, body=body_instance)
+        # Создаём персонажа и возвращаем его через callback
+        # Главный окно должно предоставить callback для создания персонажа
+        if hasattr(self, 'on_character_created_callback'):
+            self.on_character_created_callback(name, body_instance)
+        else:
+            # Fallback: создаём персонажа напрямую (требует импорта core)
+            from core.character import Character
+            self.current_character = Character(name=name, body=body_instance)
 
-        # Add selected components
-        for comp_name, var in self.component_vars.items():
-            if var.get():
-                comp_class = self.available_components[comp_name]
-                comp_instance = comp_class()
-                self.current_character.add_component(comp_instance)
+            # Add selected components - получаем компоненты из главного окна
+            available_components = getattr(self, 'available_components', {})
+            for comp_name, var in self.component_vars.items():
+                if var.get():
+                    comp_class = available_components.get(comp_name)
+                    if comp_class:
+                        comp_instance = comp_class()
+                        self.current_character.add_component(comp_instance)
 
-        print(f"GUI: Created character {self.current_character.name}")
-        self.show_character_view()
+        print(f"GUI: Created character {getattr(self, 'current_character', None).name if hasattr(self, 'current_character') else 'N/A'}")
+        if hasattr(self, 'show_character_view'):
+            self.show_character_view()

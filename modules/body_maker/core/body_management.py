@@ -9,9 +9,8 @@ import uuid
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-# Обновленные импорты для новой структуры
+# Обновленные импорты для новой структуры - используем только внутренние модули
 from modules.body_maker.core.config import BODIES_DATA_DIR
-from core.module_loader import load_available_modules_and_bodies
 
 
 class BodyManagementMixin:
@@ -19,7 +18,29 @@ class BodyManagementMixin:
     
     def _reload_available_bodies(self):
         """Перезагружает список доступных компонентов и тел."""
-        self.available_components, self.available_bodies = load_available_modules_and_bodies()
+        # Загружаем тела только из JSON файлов в директории data/json_files
+        self.available_bodies = {}
+        
+        if os.path.exists(BODIES_DATA_DIR):
+            for filename in os.listdir(BODIES_DATA_DIR):
+                if filename.endswith(".json"):
+                    filepath = os.path.join(BODIES_DATA_DIR, filename)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        
+                        class_name = data.get("class_name")
+                        if class_name:
+                            # Создаём фабрику которая будет создавать экземпляры при вызове
+                            def make_body_factory(body_data):
+                                from modules.body_maker.core.body_classes import DynamicBody
+                                def factory(**kwargs):
+                                    return DynamicBody.from_dict(body_data)
+                                return factory
+                            
+                            self.available_bodies[class_name] = make_body_factory(data)
+                    except Exception as e:
+                        print(f"  Error loading body JSON {filename}: {e}")
     
     def show_start_screen(self):
         """Возвращает к начальному экрану (делегирование родительскому окну)."""

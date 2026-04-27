@@ -4,13 +4,10 @@ GUI миксины для интеграции Body Maker с главным ок
 Эти миксины зависят от tkinter и основного приложения.
 """
 
-from core.gui.start_screen_mixin import StartScreenMixin
 from modules.body_maker.gui.creation_screen_mixin import CreationScreenMixin
 from modules.body_maker.gui.body_editor_mixin import BodyEditorMixin
 
 __all__ = [
-    'StartScreenMixin',
     'CreationScreenMixin',
-    'CharacterViewMixin',
     'BodyEditorMixin',
 ]

@@ -2,10 +2,12 @@
 """
 Модуль для управления типами тел (Body Maker Core).
 Инкапсулирует всю логику создания, редактирования, удаления и отображения типов тел.
+
+Этот модуль полностью независим и способен работать отдельно от core.
 """
 
-# Импортируем классы тел отдельно - они не зависят от tkinter
-from .body_classes import AbstractBody, DynamicBody, generate_short_id
+# Импортируем локальные классы тел
+from modules.body_maker.core.body_classes import AbstractBody, DynamicBody, generate_short_id
 
 # Импортируем миксины
 from .tree_operations import TreeOperationsMixin
