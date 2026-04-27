@@ -307,3 +307,42 @@ class DatabaseOperationsMixin:
         btn_frame.pack(pady=10)
         ttk.Button(btn_frame, text="Load", command=confirm).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def _add_tree_to_body_recursive(self, tree_data, parent_key, visited=None):
+        """
+        Рекурсивно добавляет части дерева с защитой от дублирования имен и генерацией новых ID.
+        """
+        import uuid
+        
+        if visited is None:
+            visited = set()
+            
+        part_name = tree_data["name"]
+        
+        # Проверяем на дубликат имени у родителя и добавляем суффикс если нужно
+        existing_names = set()
+        for existing in self.current_body_structure.get(parent_key, []):
+            existing_name = existing["name"] if isinstance(existing, dict) else existing
+            existing_names.add(existing_name)
+        
+        base_name = part_name
+        counter = 1
+        new_name = part_name
+        while new_name in existing_names:
+            new_name = f"{base_name}_{counter}"
+            counter += 1
+        
+        if parent_key not in self.current_body_structure:
+            self.current_body_structure[parent_key] = []
+        
+        tags = tree_data.get("tags", [])
+        # Генерируем новый уникальный ID для добавляемой части
+        new_part_id = str(uuid.uuid4())
+        self.current_body_structure[parent_key].append({"name": new_name, "tags": tags, "part_id": new_part_id})
+        
+        # Добавляем новое имя в посещенные
+        visited.add(new_name)
+        
+        if "children" in tree_data:
+            for child in tree_data["children"]:
+                self._add_tree_to_body_recursive(child, new_name, visited.copy())
