@@ -28,8 +28,8 @@ class PartsListMixin:
             # Скрываем теги если они были видны (только одна вкладка активна)
             if self.tags_manager_visible:
                 self.tags_manager_frame.grid_remove()
-            self._update_left_panel_layout()
             self.parts_list_visible = True
+            self._update_left_panel_layout()
             self.toggle_parts_list_btn.config(text="📋 Hide List")
             self.update_parts_list_tree()  # Обновляем данные при каждом показе
             return
@@ -39,6 +39,9 @@ class PartsListMixin:
         self.parts_list_frame.grid(row=0, column=0, sticky="nsew")
         self.parts_list_frame.grid_columnconfigure(0, weight=1)
         self.parts_list_frame.grid_rowconfigure(0, weight=1)
+        
+        # Настраиваем веса строк контейнера сразу после создания
+        self.left_panel_container.grid_rowconfigure(0, weight=1)
         
         # Дерево со всеми частями (поддержка нескольких корневых узлов)
         columns = ("tags", "path")
