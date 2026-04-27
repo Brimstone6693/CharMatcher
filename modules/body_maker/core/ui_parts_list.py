@@ -135,12 +135,14 @@ class PartsListMixin:
             
             # Проверяем выделение в основном дереве
             tree_selection = self.body_parts_tree.selection()
-            if not tree_selection:
-                messagebox.showwarning("No Selection", "Please select a parent part in the main tree first.", parent=self.parent)
-                return
-            
-            parent_item = tree_selection[0]
-            parent_name = self.body_parts_tree.item(parent_item, "text")
+            if tree_selection:
+                parent_item = tree_selection[0]
+                parent_name = self.body_parts_tree.item(parent_item, "text")
+            else:
+                # Если нет выделения, добавляем к Body (как в on_load_tree_from_db)
+                parent_name = "Body"
+                if "Body" not in self.current_body_structure:
+                    self.current_body_structure["Body"] = []
             
             # Используем общую рекурсивную функцию для добавления дерева
             self._add_tree_to_body_recursive(tree_data["tree_data"], parent_name)
@@ -167,12 +169,14 @@ class PartsListMixin:
             
             # Проверяем выделение в основном дереве
             tree_selection = self.body_parts_tree.selection()
-            if not tree_selection:
-                messagebox.showwarning("No Selection", "Please select a parent part in the main tree first.", parent=self.parent)
-                return
-            
-            parent_item = tree_selection[0]
-            parent_name = self.body_parts_tree.item(parent_item, "text")
+            if tree_selection:
+                parent_item = tree_selection[0]
+                parent_name = self.body_parts_tree.item(parent_item, "text")
+            else:
+                # Если нет выделения, добавляем к Body
+                parent_name = "Body"
+                if "Body" not in self.current_body_structure:
+                    self.current_body_structure["Body"] = []
             
             # Используем общую логику для добавления части
             new_name = self._add_part_to_body(part_data, parent_name)
