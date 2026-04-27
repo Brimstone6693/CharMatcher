@@ -5,7 +5,7 @@ import os
 import json
 from core.character import Character
 from core.module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
-from core.body_types.body_classes import AbstractBody
+from modules.body_maker.core.body_classes import AbstractBody
 from core.components import BaseComponent
 from gui.mixins.start_screen_mixin import StartScreenMixin
 from gui.mixins.creation_screen_mixin import CreationScreenMixin
@@ -250,7 +250,7 @@ class MainWindow(
         """Показывает экран управления типами тел (добавление новых)."""
         # Делегируем создание экрана менеджеру типов тел
         if not hasattr(self, 'body_manager'):
-            from core.body_types.core import BodyTypeManager
+            from modules.body_maker.core.core import BodyTypeManager
             self.body_manager = BodyTypeManager(self)
         
         self.body_manager.create_manage_bodies_screen()

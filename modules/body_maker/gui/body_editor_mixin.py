@@ -33,14 +33,14 @@ class BodyEditorMixin:
 
     def get_final_gender(self):
         """Returns final gender value considering custom field."""
-        from utils.gender_utils import get_final_gender_value
+        from modules.body_maker.core.gender_utils import get_final_gender_value
         base_gender = self.new_body_gender_var.get()
         custom_gender = self.new_body_gender_custom_entry.get().strip()
         return get_final_gender_value(base_gender, custom_gender)
 
     def update_auto_size(self, event=None):
         """Automatically determines size category based on height range."""
-        from utils.size_calculator import calculate_size_category
+        from modules.body_maker.core.size_calculator import calculate_size_category
         
         try:
             min_height_str = self.new_body_height_min_entry.get().strip()
