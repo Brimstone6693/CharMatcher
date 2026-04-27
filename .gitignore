@@ -1,48 +1,39 @@
-# Compiled and build artifacts
-*.pyc
+```gitignore
+# Python
 __pycache__/
-*.o
-*.obj
-*.out
-
-# Dependencies
-.venv/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
 venv/
-node_modules/
-
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Coverage
+.venv/
+.ENV
+.python-version
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
 .coverage
-coverage/
-htmlcov/
-
-# Python specific
-*.pyc
-__pycache__/
-.mypy_cache/
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
 .pytest_cache/
+.mypy_cache/
+.hypothesis/
 
-# Build directories
+# Generated files
 dist/
 build/
-target/
-.gradle/
-
-# System files
-.DS_Store
-Thumbs.db
+*.egg-info/
+.eggs/
+.installed.cfg
+lib/
+lib64/
+parts/
+sdist/
+develop-eggs/
+easy-install.pth
+```

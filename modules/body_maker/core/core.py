@@ -1,4 +1,4 @@
-# file: body_type_manager/core.py
+# file: modules/body_maker/core/core.py
 """
 Основной класс BodyTypeManager и базовая функциональность.
 """
@@ -9,18 +9,23 @@ import uuid
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import copy
-from core.module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
-from data.parts_database import PartsDatabase
 
-from .ui_structure import UIStructureMixin
-from .ui_parts_list import PartsListMixin
-from .ui_tags_manager import TagsManagerMixin
-from .tree_operations import TreeOperationsMixin
-from .tree_editing import TreeEditingMixin
-from .tree_clipboard import TreeClipboardMixin
-from .database_operations import DatabaseOperationsMixin
-from .body_management import BodyManagementMixin
-from .history import HistoryMixin
+# Обновленные импорты для новой структуры
+from modules.body_maker.core.ui_structure import UIStructureMixin
+from modules.body_maker.core.ui_parts_list import PartsListMixin
+from modules.body_maker.core.ui_tags_manager import TagsManagerMixin
+from modules.body_maker.core.tree_operations import TreeOperationsMixin
+from modules.body_maker.core.tree_editing import TreeEditingMixin
+from modules.body_maker.core.tree_clipboard import TreeClipboardMixin
+from modules.body_maker.core.database_operations import DatabaseOperationsMixin
+from modules.body_maker.core.body_management import BodyManagementMixin
+from modules.body_maker.core.history import HistoryMixin
+from modules.body_maker.core.size_calculator import SizeCalculatorMixin
+from modules.body_maker.core.gender_utils import GenderUtilsMixin
+
+# Импорт данных и утилит
+from modules.body_maker.data.parts_database import PartsDatabase
+from utils.id_generator import generate_short_id
 
 
 class BodyTypeManager(
@@ -32,7 +37,9 @@ class BodyTypeManager(
     TagsManagerMixin,
     DatabaseOperationsMixin,
     BodyManagementMixin,
-    UIStructureMixin
+    UIStructureMixin,
+    SizeCalculatorMixin,
+    GenderUtilsMixin
 ):
     """
     Класс для управления типами тел в GUI.
@@ -41,11 +48,15 @@ class BodyTypeManager(
     Миксины предоставляют следующую функциональность:
     - HistoryMixin: Undo/Redo
     - TreeOperationsMixin: Операции с деревом частей тела
+    - TreeEditingMixin: Редактирование дерева (переименование, inline-редактирование)
+    - TreeClipboardMixin: Копирование/вставка частей
     - PartsListMixin: Список всех частей тела
     - TagsManagerMixin: Менеджер тегов
     - DatabaseOperationsMixin: Сохранение/загрузка из базы данных
     - BodyManagementMixin: Управление типами тел (создание, сохранение, загрузка)
     - UIStructureMixin: Создание UI элементов
+    - SizeCalculatorMixin: Расчет размеров тел
+    - GenderUtilsMixin: Утилиты для работы с полом
     """
     
     # Пороги размеров для standing height (человеческий стандарт)
