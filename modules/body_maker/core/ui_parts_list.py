@@ -123,15 +123,19 @@ class PartsListMixin:
         # Проверяем, является ли элемент составной частью (деревом)
         if display_text.startswith("🌳 "):
             # Это составная часть (дерево) - используем общую логику из on_load_tree_from_db
-            tree_name = display_text[3:]  # Убираем эмодзи
+            tree_name = display_text[2:].strip()  # Убираем эмодзи и пробел (эмодзи занимает 1 символ но 4 байта в UTF-8)
             
             # Получаем данные дерева из базы
             trees = self.parts_db.get_tree_templates()
             tree_data = next((t for t in trees if t["name"] == tree_name), None)
             
             if not tree_data:
-                messagebox.showerror("Error", "Tree template not found in database.", parent=self.parent)
-                return
+                # Пробуем найти по частичному совпадению (на случай проблем с кодировкой)
+                tree_data = next((t for t in trees if tree_name.strip() in t["name"] or t["name"] in tree_name.strip()), None)
+                
+                if not tree_data:
+                    messagebox.showerror("Error", f"Tree template '{tree_name}' not found in database.\nAvailable templates: {[t['name'] for t in trees]}", parent=self.parent)
+                    return
             
             # Проверяем выделение в основном дереве
             tree_selection = self.body_parts_tree.selection()

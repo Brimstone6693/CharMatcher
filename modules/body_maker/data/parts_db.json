@@ -57,5 +57,62 @@
       "description": "A standard tail"
     }
   ],
-  "tree_templates": []
+  "tree_templates": [
+    {
+      "id": 1,
+      "name": "TestCreature",
+      "tree_data": {
+        "name": "Body",
+        "tags": [
+          "organic"
+        ],
+        "children": [
+          {
+            "name": "Head",
+            "tags": [
+              "vital"
+            ],
+            "children": [
+              {
+                "name": "Eyes",
+                "tags": [
+                  "sensory"
+                ],
+                "children": []
+              },
+              {
+                "name": "Mouth",
+                "tags": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "Torso",
+            "tags": [
+              "vital"
+            ],
+            "children": [
+              {
+                "name": "Arm",
+                "tags": [
+                  "limb"
+                ],
+                "children": []
+              },
+              {
+                "name": "Leg",
+                "tags": [
+                  "limb"
+                ],
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Test creature template",
+      "part_count": 7
+    }
+  ]
 }
