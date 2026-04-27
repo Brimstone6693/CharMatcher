@@ -6,7 +6,7 @@ import os
 import json
 
 # Обновленные импорты для новой структуры
-from modules.body_maker.core.body_management import load_available_modules_and_bodies, BODIES_DATA_DIR
+from modules.body_maker.core.config import BODIES_DATA_DIR
 
 
 class BodyEditorMixin:
