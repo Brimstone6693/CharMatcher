@@ -1,51 +1,49 @@
+# file: modules/body_maker/core/gender_utils.py
 """
-Утилиты для работы с полом персонажей.
+Миксин для утилит работы с полом персонажей.
 """
 
 
-def get_final_gender_value(gender_combobox: str, custom_gender_entry: str) -> str:
-    """
-    Получение финального значения пола с учётом custom поля.
+class GenderUtilsMixin:
+    """Предоставляет утилиты для работы с полом."""
     
-    Args:
-        gender_combobox: Значение из комбобокса (может быть "custom")
-        custom_gender_entry: Значение из поля custom (может быть пустым)
+    def get_final_gender(self):
+        """Возвращает итоговое значение пола с учётом custom поля."""
+        base_gender = self.new_body_gender_var.get()
+        custom_gender = self.new_body_gender_custom_entry.get().strip()
+        
+        if base_gender == "Other" and custom_gender:
+            return custom_gender
+        return base_gender if base_gender else "N/A"
     
-    Returns:
-        Финальное значение пола
-    """
-    if gender_combobox == "custom" and custom_gender_entry.strip():
-        return custom_gender_entry.strip()
-    return gender_combobox if gender_combobox else "N/A"
+    @staticmethod
+    def normalize_gender(gender: str) -> str:
+        """
+        Нормализация значения пола к стандартному формату.
 
+        Args:
+            gender: Исходное значение пола
 
-def normalize_gender(gender: str) -> str:
-    """
-    Нормализация значения пола к стандартному формату.
+        Returns:
+            Нормализованное значение (lowercase, trimmed)
+        """
+        if not gender:
+            return ""
+        return gender.strip().lower()
     
-    Args:
-        gender: Исходное значение пола
-    
-    Returns:
-        Нормализованное значение (lowercase, trimmed)
-    """
-    if not gender:
-        return ""
-    return gender.strip().lower()
+    @staticmethod
+    def is_custom_gender(gender: str, predefined_genders: list = None) -> bool:
+        """
+        Проверка, является ли пол кастомным (не из предопределённого списка).
 
+        Args:
+            gender: Значение пола для проверки
+            predefined_genders: Список предопределённых значений
 
-def is_custom_gender(gender: str, predefined_genders: list = None) -> bool:
-    """
-    Проверка, является ли пол кастомным (не из предопределённого списка).
-    
-    Args:
-        gender: Значение пола для проверки
-        predefined_genders: Список предопределённых значений
-    
-    Returns:
-        True если пол кастомный, False иначе
-    """
-    if predefined_genders is None:
-        predefined_genders = ["male", "female", "other", "none"]
-    
-    return gender.lower() not in [g.lower() for g in predefined_genders]
+        Returns:
+            True если пол кастомный, False иначе
+        """
+        if predefined_genders is None:
+            predefined_genders = ["male", "female", "other", "none"]
+
+        return gender.lower() not in [g.lower() for g in predefined_genders]
