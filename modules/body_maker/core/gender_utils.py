@@ -3,7 +3,7 @@
 """
 
 
-def get_final_gender(gender_combobox: str, custom_gender_entry: str) -> str:
+def get_final_gender_value(gender_combobox: str, custom_gender_entry: str) -> str:
     """
     Получение финального значения пола с учётом custom поля.
     
@@ -16,7 +16,7 @@ def get_final_gender(gender_combobox: str, custom_gender_entry: str) -> str:
     """
     if gender_combobox == "custom" and custom_gender_entry.strip():
         return custom_gender_entry.strip()
-    return gender_combobox
+    return gender_combobox if gender_combobox else "N/A"
 
 
 def normalize_gender(gender: str) -> str:
