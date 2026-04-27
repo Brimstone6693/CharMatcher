@@ -4,19 +4,7 @@
 Перемещены из пакета bodies в body_type_manager.
 """
 
-import uuid
-
-def generate_short_id(length=6):
-    """
-    Генерирует короткий уникальный ID.
-    
-    Args:
-        length: Длина ID (по умолчанию 6 символов)
-        
-    Returns:
-        Строка с уникальным ID
-    """
-    return uuid.uuid4().hex[:length]
+from utils.id_generator import generate_short_id
 
 
 class AbstractBody:
