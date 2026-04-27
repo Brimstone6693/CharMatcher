@@ -149,6 +149,10 @@ class UIStructureMixin:
         self.add_tag_menu = tk.Menu(self.tree_menu, tearoff=0)
         self.tree_menu.add_cascade(label="Add Tag", menu=self.add_tag_menu)
         
+        # Подменю для удаления тегов
+        self.remove_tag_menu = tk.Menu(self.tree_menu, tearoff=0)
+        self.tree_menu.add_cascade(label="Remove Tag", menu=self.remove_tag_menu)
+        
         self.tree_menu.add_command(label="Add Child Part", command=self.on_add_child_part)
         self.tree_menu.add_command(label="Rename Part", command=self.on_rename_part)
         self.tree_menu.add_command(label="Delete Part", command=self.on_delete_part)
