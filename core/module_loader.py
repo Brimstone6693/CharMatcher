@@ -13,7 +13,7 @@ from core.body_types.body_classes import AbstractBody, DynamicBody
 # Получаем директорию проекта (родительскую от директории этого файла)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODULES_DIR = os.path.join(PROJECT_ROOT, "modules")
-BODIES_DATA_DIR = os.path.join(PROJECT_ROOT, "modules", "body_maker", "data", "json_files")
+BODIES_DATA_DIR = os.path.join(PROJECT_ROOT, "modules", "body_maker", "data", "saved_bodies")
 
 def load_available_modules_and_bodies(components_dir=None, bodies_dir=None):
     """

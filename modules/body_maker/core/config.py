@@ -8,7 +8,7 @@ MODULES_ROOT = os.path.dirname(BODY_MAKER_ROOT)  # Корень modules/
 PROJECT_ROOT = os.path.dirname(MODULES_ROOT)     # Корень проекта
 
 # Пути внутри Body Maker
-BODIES_DATA_DIR = os.path.join(BODY_MAKER_ROOT, "data", "json_files")
+BODIES_DATA_DIR = os.path.join(BODY_MAKER_ROOT, "data", "saved_bodies")
 PARTS_DB_FILE = os.path.join(BODY_MAKER_ROOT, "data", "parts_db.json")
 TAGS_DB_FILE = os.path.join(BODY_MAKER_ROOT, "data", "tags_db.json")
 

@@ -18,7 +18,7 @@ class BodyManagementMixin:
     
     def _reload_available_bodies(self):
         """Перезагружает список доступных компонентов и тел."""
-        # Загружаем тела только из JSON файлов в директории data/json_files
+        # Загружаем тела только из JSON файлов в директории data/saved_bodies
         self.available_bodies = {}
         
         if os.path.exists(BODIES_DATA_DIR):

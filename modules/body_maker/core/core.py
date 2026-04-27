@@ -17,7 +17,7 @@ from modules.body_maker.core.size_calculator import SizeCalculatorMixin
 from modules.body_maker.core.gender_utils import GenderUtilsMixin
 
 # Импорт данных и утилит
-from modules.body_maker.data.parts_database import PartsDatabase
+from modules.body_maker.data.parts_database_handler import PartsDatabase
 from modules.body_maker.core.config import PARTS_DB_FILE
 
 
