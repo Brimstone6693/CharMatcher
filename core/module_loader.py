@@ -1,14 +1,19 @@
 # file: module_loader.py
+"""
+Загрузчик модулей и тел.
+Автоматически сканирует директорию modules и загружает доступные компоненты и тела.
+"""
+
 import os
 import importlib.util
 import json
 from core.components import BaseComponent
-from modules.body_maker.core.body_classes import AbstractBody, DynamicBody # Импортируем базовый класс тела и динамический класс
+from core.body_types.body_classes import AbstractBody, DynamicBody
 
 # Получаем директорию проекта (родительскую от директории этого файла)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODULES_DIR = os.path.join(PROJECT_ROOT, "modules")
-from modules.body_maker.core.config import BODIES_DATA_DIR
+BODIES_DATA_DIR = os.path.join(PROJECT_ROOT, "modules", "body_maker", "data", "json_files")
 
 def load_available_modules_and_bodies(components_dir=None, bodies_dir=None):
     """

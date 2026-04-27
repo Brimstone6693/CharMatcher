@@ -1,9 +1,13 @@
-# file: main.py
+# file: main_entry.py
+"""
+Точка входа в приложение Character Creator.
+Использует core для загрузки модулей и управления персонажами.
+"""
+
 import os
-import json # Для сохранения/загрузки
+import json
 from core.character import Character
-from core.module_loader import load_available_modules_and_bodies # Обновлённая функция
-# from body import HumanoidBody # Больше не нужен здесь
+from core.module_loader import load_available_modules_and_bodies
 
 def main():
     print("=== Welcome to Character Creator ===")
@@ -42,7 +46,7 @@ def main():
 
 
 def load_character_flow(available_components, available_bodies):
-    save_dir = "core/saved_characters"
+    save_dir = os.path.join(PROJECT_ROOT, "saved_characters")
     if not os.path.exists(save_dir):
         print(f"Save directory '{save_dir}' not found.")
         return None
@@ -133,7 +137,7 @@ def create_character_flow(available_components, available_bodies):
 
 # --- Функция сохранения ---
 def save_character_flow(character):
-    save_dir = "core/saved_characters"
+    save_dir = os.path.join(PROJECT_ROOT, "saved_characters")
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -152,6 +156,9 @@ def save_character_flow(character):
     except Exception as e:
         print(f"Error saving character: {e}")
 
+
+# Получаем корневую директорию проекта
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 if __name__ == "__main__":

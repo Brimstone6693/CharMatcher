@@ -79,7 +79,6 @@ class BodyTypeManager(
             parent_window: Родительское окно Tkinter
         """
         self.parent = parent_window
-        self.available_components = {}
         self.available_bodies = {}
         
         # Переменные формы
@@ -111,5 +110,5 @@ class BodyTypeManager(
         self.tags_manager_frame = None
         self.tags_manager_visible = False
         
-        # Загружаем доступные модули и тела
+        # Загружаем доступные тела
         self._reload_available_bodies()
