@@ -86,12 +86,10 @@ class BodyManagementMixin:
     
     def get_final_gender(self):
         """Возвращает итоговое значение пола с учётом custom поля."""
+        from modules.body_maker.core.gender_utils import get_final_gender_value
         base_gender = self.new_body_gender_var.get()
         custom_gender = self.new_body_gender_custom_entry.get().strip()
-        
-        if custom_gender:
-            return custom_gender
-        return base_gender if base_gender else "N/A"
+        return get_final_gender_value(base_gender, custom_gender)
     
     def new_body(self):
         """Создает новое тело (сбрасывает текущую структуру)"""

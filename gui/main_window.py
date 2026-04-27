@@ -7,10 +7,10 @@ from core.character import Character
 from core.module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
 from modules.body_maker.core.body_classes import AbstractBody
 from core.components import BaseComponent
-from gui.mixins.start_screen_mixin import StartScreenMixin
-from gui.mixins.creation_screen_mixin import CreationScreenMixin
-from gui.mixins.character_view_mixin import CharacterViewMixin
-from gui.mixins.body_editor_mixin import BodyEditorMixin
+from modules.body_maker.gui.start_screen_mixin import StartScreenMixin
+from modules.body_maker.gui.creation_screen_mixin import CreationScreenMixin
+from modules.body_maker.gui.character_view_mixin import CharacterViewMixin
+from modules.body_maker.gui.body_editor_mixin import BodyEditorMixin
 
 class MainWindow(
     tk.Tk,
@@ -33,146 +33,10 @@ class MainWindow(
 
         self.show_start_screen()
 
-    def show_start_screen(self):
-        """Показывает начальный экран с кнопками Load и Create."""
-        # Очищаем предыдущее содержимое
-        for widget in self.winfo_children():
-            widget.destroy()
-
-        frame = ttk.Frame(self)
-        frame.pack(expand=True)
-
-        label = ttk.Label(frame, text="Welcome to Character Creator!", font=("Arial", 16))
-        label.pack(pady=20)
-
-        load_button = ttk.Button(frame, text="Load Character", command=self.on_load_clicked)
-        load_button.pack(pady=5)
-
-        create_button = ttk.Button(frame, text="Create New Character", command=self.on_create_clicked)
-        create_button.pack(pady=5)
-
-        manage_bodies_button = ttk.Button(frame, text="Manage Body Types", command=self.show_manage_bodies_screen)
-        manage_bodies_button.pack(pady=5)
-
-    def on_load_clicked(self):
-        """Обработчик кнопки Load."""
-        # Открываем диалог выбора файла
-        file_path = filedialog.askopenfilename(
-            title="Select Character Save File",
-            initialdir="saved_characters",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-        )
-        if file_path:
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                # Загружаем персонажа, передавая ему загруженные классы
-                self.current_character = Character.from_dict(data, self.available_components, self.available_bodies)
-                print(f"GUI: Successfully loaded character {self.current_character.name} from {file_path}")
-                # Показываем окно просмотра загруженного персонажа
-                self.show_character_view()
-            except Exception as e:
-                messagebox.showerror("Load Error", f"Failed to load character:\n{e}")
-
     def on_create_clicked(self):
         """Обработчик кнопки Create."""
         # Показываем окно создания
         self.show_creation_screen()
-
-    def show_creation_screen(self):
-        """Показывает экран создания персонажа."""
-        # Очищаем предыдущее содержимое
-        for widget in self.winfo_children():
-            widget.destroy()
-
-        if not self.available_bodies:
-            messagebox.showwarning("No Bodies", "No body types found. Cannot create character.")
-            self.show_start_screen() # Возвращаемся назад
-            return
-
-        frame = ttk.Frame(self)
-        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-
-        # Имя персонажа
-        ttk.Label(frame, text="Character Name:").pack(anchor=tk.W)
-        self.name_entry = ttk.Entry(frame)
-        self.name_entry.pack(fill=tk.X, pady=(0, 10))
-
-        # Выбор тела
-        ttk.Label(frame, text="Body Type:").pack(anchor=tk.W)
-        body_names = list(self.available_bodies.keys())
-        self.body_var = tk.StringVar(value=body_names[0] if body_names else "") # Выбираем первый по умолчанию
-        self.body_combo = ttk.Combobox(frame, textvariable=self.body_var, values=body_names, state="readonly")
-        self.body_combo.pack(fill=tk.X, pady=(0, 10))
-
-        # Выбор компонентов
-        ttk.Label(frame, text="Select Components:").pack(anchor=tk.W)
-        self.component_vars = {}
-        comp_frame = ttk.Frame(frame)
-        comp_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
-
-        canvas = tk.Canvas(comp_frame)
-        scrollbar = ttk.Scrollbar(comp_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        for comp_name in self.available_components.keys():
-            var = tk.BooleanVar()
-            chk = ttk.Checkbutton(scrollable_frame, text=comp_name, variable=var)
-            chk.pack(anchor=tk.W)
-            self.component_vars[comp_name] = var
-
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-
-        # Кнопка создания
-        create_btn = ttk.Button(frame, text="Create Character", command=self.on_create_confirm_clicked)
-        create_btn.pack(pady=10)
-
-        # Кнопка назад
-        back_btn = ttk.Button(frame, text="Back", command=self.show_start_screen)
-        back_btn.pack()
-
-    def on_create_confirm_clicked(self):
-        """Обработчик подтверждения создания."""
-        name = self.name_entry.get().strip()
-        if not name:
-            messagebox.showwarning("Invalid Input", "Please enter a character name.")
-            return
-
-        # Получаем выбранный тип тела
-        selected_body_name = self.body_var.get()
-        selected_body_class = self.available_bodies.get(selected_body_name)
-        if not selected_body_class:
-             # Это маловероятно, если Combobox readonly, но на всякий случай
-            messagebox.showerror("Creation Error", f"Selected body type '{selected_body_name}' not found.")
-            return
-
-        # Создаём тело (с минимальными параметрами для примера)
-        # В реальности здесь может быть больше полей для ввода, специфичных для тела
-        body_instance = selected_body_class(race=selected_body_name.replace("Body", "").lower(), gender="N/A")
-
-        # Создаём персонажа
-        self.current_character = Character(name=name, body=body_instance)
-
-        # Добавляем выбранные компоненты
-        for comp_name, var in self.component_vars.items():
-            if var.get(): # Если чекбокс отмечен
-                comp_class = self.available_components[comp_name]
-                comp_instance = comp_class() # Создаём с параметрами по умолчанию
-                self.current_character.add_component(comp_instance)
-
-        print(f"GUI: Created character {self.current_character.name}")
-        # Показываем созданный персонаж
-        self.show_character_view()
 
 
     def show_character_view(self):
