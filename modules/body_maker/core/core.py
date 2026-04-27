@@ -18,6 +18,7 @@ from modules.body_maker.core.gender_utils import GenderUtilsMixin
 
 # Импорт данных и утилит
 from modules.body_maker.data.parts_database import PartsDatabase
+from modules.body_maker.core.config import PARTS_DB_FILE
 
 
 class BodyTypeManager(
@@ -99,7 +100,7 @@ class BodyTypeManager(
         self.max_history_size = 50
         
         # База данных частей тела
-        self.parts_db = PartsDatabase()
+        self.parts_db = PartsDatabase(db_path=PARTS_DB_FILE)
         
         # Состояние видимости панели списка частей
         self.parts_list_visible = False
