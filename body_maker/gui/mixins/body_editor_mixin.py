@@ -31,10 +31,10 @@ class BodyEditorMixin:
 
     def get_final_gender(self):
         """Returns final gender value considering custom field."""
-        from utils.gender_utils import get_final_gender_value
+        from utils.gender_utils import get_final_gender
         base_gender = self.new_body_gender_var.get()
         custom_gender = self.new_body_gender_custom_entry.get().strip()
-        return get_final_gender_value(base_gender, custom_gender)
+        return get_final_gender(base_gender, custom_gender)
 
     def update_auto_size(self, event=None):
         """Automatically determines size category based on height range."""
