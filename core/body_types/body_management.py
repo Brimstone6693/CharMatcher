@@ -5,6 +5,7 @@
 
 import os
 import json
+import uuid
 import tkinter as tk
 from tkinter import messagebox, ttk
 from core.module_loader import BODIES_DATA_DIR, load_available_modules_and_bodies
@@ -221,8 +222,34 @@ class BodyManagementMixin:
             self.new_body_desc_template_entry.delete(0, tk.END)
             self.new_body_desc_template_entry.insert(0, desc_template)
             
-            # Структура тела
-            self.current_body_structure = data.get("body_structure", {})
+            # Структура тела - нормализуем данные, добавляя part_id если отсутствует
+            raw_structure = data.get("body_structure", {})
+            self.current_body_structure = {}
+            
+            def normalize_part(part):
+                """Убеждается, что часть имеет все необходимые поля."""
+                if isinstance(part, str):
+                    # Если часть - просто строка, преобразуем в словарь
+                    return {"name": part, "tags": [], "part_id": str(uuid.uuid4())}
+                elif isinstance(part, dict):
+                    # Если часть - словарь, убеждаемся что есть все поля
+                    if "part_id" not in part:
+                        part["part_id"] = str(uuid.uuid4())
+                    if "tags" not in part:
+                        part["tags"] = []
+                    if "name" not in part:
+                        return None  # Пропускаем части без имени
+                    return part
+                return None
+            
+            for parent_key, children in raw_structure.items():
+                normalized_children = []
+                for child in children:
+                    normalized = normalize_part(child)
+                    if normalized is not None:
+                        normalized_children.append(normalized)
+                self.current_body_structure[parent_key] = normalized_children
+            
             self.update_body_parts_tree()
             self.update_auto_size()
             

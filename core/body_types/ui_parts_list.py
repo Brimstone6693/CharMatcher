@@ -64,11 +64,8 @@ class PartsListMixin:
         # Заполняем дерево всеми частями
         self.update_parts_list_tree()
         
-        # Двойной клик для редактирования
+        # Двойной клик для загрузки части/дерева
         self.parts_list_tree.bind("<Double-1>", self.on_parts_list_double_click)
-        
-        # Настраиваем Drag and Drop для списка частей
-        self._setup_parts_list_drag_and_drop()
         
         self.parts_list_visible = True
         self.toggle_parts_list_btn.config(text="📋 Hide List")
@@ -224,65 +221,3 @@ class PartsListMixin:
         })
         
         return new_name
-    
-    def _setup_parts_list_drag_and_drop(self):
-        """Настраивает Drag and Drop для списка частей тела."""
-        # Инициализация переменных для drag-and-drop
-        self._drag_data = {"item": None, "target": None}
-        
-        def on_drag_start(event):
-            widget = event.widget
-            item = widget.identify_row(event.y)
-            if item:
-                self._drag_data["item"] = item
-                widget.selection_set(item)
-        
-        def on_drag_drop(event):
-            widget = event.widget
-            target_item = widget.identify_row(event.y)
-            if target_item and self._drag_data["item"]:
-                # Определяем тип элемента (часть или дерево)
-                source_display = widget.item(self._drag_data["item"], "text")
-                
-                # Проверяем выделение в основном дереве
-                tree_selection = self.body_parts_tree.selection()
-                if not tree_selection:
-                    messagebox.showwarning("No Selection", "Please select a parent part in the main tree first.", parent=self.parent)
-                    return
-                
-                parent_item = tree_selection[0]
-                parent_name = self.body_parts_tree.item(parent_item, "text")
-                
-                if source_display.startswith("🌳 "):
-                    # Это дерево
-                    tree_name = source_display[3:]
-                    trees = self.parts_db.get_tree_templates()
-                    tree_data = next((t for t in trees if t["name"] == tree_name), None)
-                    
-                    if tree_data:
-                        self._add_tree_to_body_recursive(tree_data["tree_data"], parent_name)
-                        self._save_action_state("paste_tree", {
-                            "tree_data": copy.deepcopy(tree_data["tree_data"]),
-                            "parent": parent_name
-                        })
-                else:
-                    # Это индивидуальная часть
-                    part_name = source_display
-                    parts = self.parts_db.get_individual_parts()
-                    part_data = next((p for p in parts if p["name"] == part_name), None)
-                    
-                    if part_data:
-                        new_name = self._add_part_to_body(part_data, parent_name)
-                        self._save_action_state("add_child", {
-                            "name": new_name,
-                            "tags": part_data.get("tags", []),
-                            "parent": parent_name
-                        })
-                
-                self.update_body_parts_tree()
-                self.update_parts_list_tree()
-            
-            self._drag_data["item"] = None
-        
-        self.parts_list_tree.bind("<ButtonPress-1>", on_drag_start)
-        self.parts_list_tree.bind("<ButtonRelease-1>", on_drag_drop)
