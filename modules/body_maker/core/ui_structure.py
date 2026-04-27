@@ -19,6 +19,30 @@ class UIStructureMixin:
         for widget in self.parent.winfo_children():
             widget.destroy()
         
+        # Сбрасываем ссылки на виджеты которые будут пересозданы
+        if hasattr(self, 'bodies_listbox'):
+            self.bodies_listbox = None
+        if hasattr(self, 'body_parts_tree'):
+            self.body_parts_tree = None
+        if hasattr(self, 'new_body_class_name_entry'):
+            self.new_body_class_name_entry = None
+        if hasattr(self, 'new_body_display_name_entry'):
+            self.new_body_display_name_entry = None
+        if hasattr(self, 'new_body_height_min_entry'):
+            self.new_body_height_min_entry = None
+        if hasattr(self, 'new_body_height_max_entry'):
+            self.new_body_height_max_entry = None
+        if hasattr(self, 'new_body_gender_var'):
+            self.new_body_gender_var = None
+        if hasattr(self, 'new_body_gender_custom_entry'):
+            self.new_body_gender_custom_entry = None
+        if hasattr(self, 'new_body_desc_template_entry'):
+            self.new_body_desc_template_entry = None
+        if hasattr(self, 'height_type_var'):
+            self.height_type_var = None
+        if hasattr(self, 'auto_size_label'):
+            self.auto_size_label = None
+        
         # Устанавливаем заголовок окна
         self.parent.title("Body Master")
         

@@ -276,12 +276,15 @@ class BodyManagementMixin:
                 return None
             
             for parent_key, children in raw_structure.items():
+                # Нормализуем ключ: "null" или None -> None (корневые элементы)
+                normalized_key = None if parent_key is None or parent_key == "null" else parent_key
+                
                 normalized_children = []
                 for child in children:
                     normalized = normalize_part(child)
                     if normalized is not None:
                         normalized_children.append(normalized)
-                self.current_body_structure[parent_key] = normalized_children
+                self.current_body_structure[normalized_key] = normalized_children
             
             # Обновляем дерево частей тела
             self.update_body_parts_tree()
