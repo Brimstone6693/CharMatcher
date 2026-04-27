@@ -29,8 +29,8 @@ class TagsManagerMixin:
             # Скрываем список частей если он был виден (только одна вкладка активна)
             if self.parts_list_visible:
                 self.parts_list_frame.grid_remove()
-            self._update_left_panel_layout()
             self.tags_manager_visible = True
+            self._update_left_panel_layout()
             self.toggle_tags_manager_btn.config(text="🏷️ Hide Tags")
             self.update_tags_manager_tree()
             return
@@ -40,6 +40,9 @@ class TagsManagerMixin:
         self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
         self.tags_manager_frame.grid_columnconfigure(0, weight=1)
         self.tags_manager_frame.grid_rowconfigure(0, weight=1)
+        
+        # Настраиваем веса строк контейнера сразу после создания
+        self.left_panel_container.grid_rowconfigure(0, weight=1)
         
         # Дерево с тегами
         columns = ("category", "description")
