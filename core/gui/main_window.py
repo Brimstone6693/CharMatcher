@@ -3,13 +3,10 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
 import json
-from core.character import Character
 from core.module_loader import load_available_modules_and_bodies, BODIES_DATA_DIR
-from modules.body_maker.core.body_classes import AbstractBody
-from core.components import BaseComponent
-from modules.body_maker.gui.start_screen_mixin import StartScreenMixin
+from core.gui.start_screen_mixin import StartScreenMixin
 from modules.body_maker.gui.creation_screen_mixin import CreationScreenMixin
-from modules.body_maker.gui.character_view_mixin import CharacterViewMixin
+from core.gui.mixins.character_view_mixin import CharacterViewMixin
 from modules.body_maker.gui.body_editor_mixin import BodyEditorMixin
 
 class MainWindow(

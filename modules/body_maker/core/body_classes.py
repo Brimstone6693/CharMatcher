@@ -4,7 +4,7 @@
 Перемещены из пакета bodies в body_type_manager.
 """
 
-from utils.id_generator import generate_short_id
+from core.utils import generate_short_id
 
 
 class AbstractBody:

@@ -42,7 +42,7 @@ def main():
 
 
 def load_character_flow(available_components, available_bodies):
-    save_dir = "saved_characters"
+    save_dir = "core/saved_characters"
     if not os.path.exists(save_dir):
         print(f"Save directory '{save_dir}' not found.")
         return None
@@ -133,7 +133,7 @@ def create_character_flow(available_components, available_bodies):
 
 # --- Функция сохранения ---
 def save_character_flow(character):
-    save_dir = "saved_characters"
+    save_dir = "core/saved_characters"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 

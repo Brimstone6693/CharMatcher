@@ -3,13 +3,6 @@
 Основной класс BodyTypeManager и базовая функциональность.
 """
 
-import os
-import json
-import uuid
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-import copy
-
 # Обновленные импорты для новой структуры
 from modules.body_maker.core.ui_structure import UIStructureMixin
 from modules.body_maker.core.ui_parts_list import PartsListMixin
@@ -25,7 +18,6 @@ from modules.body_maker.core.gender_utils import GenderUtilsMixin
 
 # Импорт данных и утилит
 from modules.body_maker.data.parts_database import PartsDatabase
-from utils.id_generator import generate_short_id
 
 
 class BodyTypeManager(
