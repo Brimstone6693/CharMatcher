@@ -743,7 +743,13 @@ class ListManagerApp(tk.Tk):
                     )
         else:
             self.status_combo.config(state="readonly")
-            self.status_preview.config(text="(ручной)", fg="#000")
+            # При переключении в ручной режим показать текущее значение из status_var с правильным цветом
+            try:
+                val = int(self.status_var.get())
+                color = STATUS_COLORS.get(val, "#000")
+            except ValueError:
+                color = "#000"
+            self.status_preview.config(text="(ручной)", fg=color)
 
     def bind_events(self):
         self.lists_lb.bind("<<ListboxSelect>>", self.on_list_select)
