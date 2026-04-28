@@ -1078,13 +1078,21 @@ class ListManagerApp(tk.Tk):
         self.load_element_details()
 
     def save_file(self):
-        path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
+        path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON", "*.json")],
+            initialdir="data",
+            initialfile="lists_data.json"
+        )
         if path:
             self.manager.export_to_json(path)
             messagebox.showinfo("Сохранение", f"Данные сохранены в:\n{path}")
 
     def load_file(self):
-        path = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
+        path = filedialog.askopenfilename(
+            filetypes=[("JSON", "*.json")],
+            initialdir="data"
+        )
         if path:
             try:
                 self.manager.import_from_json(path)
