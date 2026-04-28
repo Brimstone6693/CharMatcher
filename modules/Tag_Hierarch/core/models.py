@@ -400,17 +400,25 @@ class ListManager:
                 })
         return info
 
-    def export_to_json(self, filepath: str):
+    def export_to_json(self, filepath: Optional[str] = None) -> Optional[str]:
         data = {
             "lists": {lid: lst.to_dict() for lid, lst in self.lists.items()},
             "global_elements": self._global_elements,
         }
+        if filepath is None:
+            return json.dumps(data, ensure_ascii=False, indent=2)
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        return None
 
-    def import_from_json(self, filepath: str):
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
+    def import_from_json(self, filepath: Optional[str] = None, json_str: Optional[str] = None):
+        if filepath:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        elif json_str:
+            data = json.loads(json_str)
+        else:
+            raise ValueError("Необходимо указать либо filepath, либо json_str")
         self.lists = {}
         self._global_elements = data.get("global_elements", {})
         for lid, lst_data in data.get("lists", {}).items():
