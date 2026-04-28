@@ -200,40 +200,47 @@ class ListManagerApp(tk.Tk):
 
     def _on_status_changed(self, event=None):
         """Обработчик изменения статуса в combobox (ручной режим)."""
+        if not self.selected_element_id:
+            return
         try:
             val = int(self.status_var.get())
+            # Немедленно обновляем статус в модели для предпросмотра
+            elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
+            elem.custom_status = max(-3, min(3, val))
+            self.manager._recalculate_states()
+            self.refresh_tree()
             color = STATUS_COLORS.get(val, "#000")
             self.status_preview.config(text=f"(ручной: {val})", fg=color)
         except ValueError:
             self.status_preview.config(text="(ручной)", fg="#000")
 
     def _on_auto_changed(self):
+        if not self.selected_element_id or not self.current_list_id:
+            return
         if self.status_auto_var.get():
             self.status_combo.config(state="disabled")
             # Показать текущий рассчитанный статус
-            if self.selected_element_id:
-                info = self.manager.get_element_info(self.selected_element_id)
-                if info:
-                    self.status_var.set(str(info['status']))
-                    self.status_preview.config(
-                        text=f"→ Авто: {info['status']}",
-                        fg=STATUS_COLORS.get(info["status"], "#000"),
-                    )
+            info = self.manager.get_element_info(self.selected_element_id)
+            if info:
+                self.status_var.set(str(info['status']))
+                self.status_preview.config(
+                    text=f"→ Авто: {info['status']}",
+                    fg=STATUS_COLORS.get(info["status"], "#000"),
+                )
         else:
             self.status_combo.config(state="readonly")
             # При переключении в ручной режим инициализировать status_var текущим статусом
-            if self.selected_element_id:
-                info = self.manager.get_element_info(self.selected_element_id)
-                if info:
-                    cs = info.get('custom_status')
-                    if cs is not None:
-                        # Элемент уже имел кастомный статус - восстанавливаем его
-                        self.status_var.set(str(cs))
-                        self.status_preview.config(text=f"(ручной: {cs})", fg=STATUS_COLORS.get(cs, "#000"))
-                    else:
-                        # Кастомного статуса не было - используем текущий авто-статус как начальное значение
-                        self.status_var.set(str(info['status']))
-                        self.status_preview.config(text=f"(ручной)", fg=STATUS_COLORS.get(info['status'], "#000"))
+            info = self.manager.get_element_info(self.selected_element_id)
+            if info:
+                cs = info.get('custom_status')
+                if cs is not None:
+                    # Элемент уже имел кастомный статус - восстанавливаем его
+                    self.status_var.set(str(cs))
+                    self.status_preview.config(text=f"(ручной: {cs})", fg=STATUS_COLORS.get(cs, "#000"))
+                else:
+                    # Кастомного статуса не было - используем текущий авто-статус как начальное значение
+                    self.status_var.set(str(info['status']))
+                    self.status_preview.config(text=f"(ручной)", fg=STATUS_COLORS.get(info['status'], "#000"))
 
     def bind_events(self):
         self.lists_lb.bind("<<ListboxSelect>>", self.on_list_select)
@@ -479,14 +486,11 @@ class ListManagerApp(tk.Tk):
         elem.name = self.name_var.get().strip()
         elem.description = self.desc_text.get("1.0", tk.END).strip()
 
+        # Статус уже был обновлён в _on_status_changed() при изменении combobox
+        # Здесь только переключаем между авто/ручным режимом
         if self.status_auto_var.get():
             elem.custom_status = None
-        else:
-            try:
-                val = int(self.status_var.get())
-                elem.custom_status = max(-3, min(3, val))
-            except ValueError:
-                elem.custom_status = None  # Вместо 0 устанавливаем None (авто) при ошибке
+        # Если ручной режим - custom_status уже установлен в _on_status_changed()
 
         self.manager._recalculate_states()
         self.refresh_tree()
