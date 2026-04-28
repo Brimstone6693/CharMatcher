@@ -4,40 +4,46 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
+
+# Compiled and build artifacts
+*.o
+*.obj
 *.so
-*.egg-info/
+*.a
+*.dll
+*.exe
+*.out
 
-# Virtual environments
-venv/
+# Dependencies
 .venv/
-env/
-ENV/
+venv/
+node_modules/
+.mypy_cache/
+.pytest_cache/
 
-# Build artifacts
-build/
-dist/
-*.egg
-
-# Logs
+# Logs and temp files
 *.log
-
-# IDE
-.vscode/
-.idea/
+*.tmp
 *.swp
 *.swo
 
-# OS
-.DS_Store
-Thumbs.db
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
 
 # Coverage
-.coverage
-htmlcov/
 coverage/
+htmlcov/
+.coverage
 
-# Testing
-.pytest_cache/
-.mypy_cache/
+# Distribution
+dist/
+build/
+target/
+.gradle/
 ```

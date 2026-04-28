@@ -204,17 +204,23 @@ class ListManagerApp(tk.Tk):
             if self.selected_element_id:
                 info = self.manager.get_element_info(self.selected_element_id)
                 if info:
+                    self.status_var.set(str(info['status']))
                     self.status_preview.config(
                         text=f"→ Авто: {info['status']}",
                         fg=STATUS_COLORS.get(info["status"], "#000"),
                     )
         else:
             self.status_combo.config(state="readonly")
-            # При переключении в ручной режим показать текущее значение из status_var с правильным цветом
+            # При переключении в ручной режим инициализировать status_var текущим статусом
+            if self.selected_element_id:
+                info = self.manager.get_element_info(self.selected_element_id)
+                if info:
+                    self.status_var.set(str(info['status']))
             try:
                 val = int(self.status_var.get())
                 color = STATUS_COLORS.get(val, "#000")
             except ValueError:
+                val = 0
                 color = "#000"
             self.status_preview.config(text="(ручной)", fg=color)
 
@@ -546,13 +552,21 @@ class ListManagerApp(tk.Tk):
         self.load_element_details()
 
     def save_file(self):
-        path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
+        path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON", "*.json")],
+            initialdir="data",
+            initialfile="lists_data.json"
+        )
         if path:
             self.manager.export_to_json(path)
             messagebox.showinfo("Сохранение", f"Данные сохранены в:\n{path}")
 
     def load_file(self):
-        path = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
+        path = filedialog.askopenfilename(
+            filetypes=[("JSON", "*.json")],
+            initialdir="data"
+        )
         if path:
             try:
                 self.manager.import_from_json(path)
