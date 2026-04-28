@@ -407,6 +407,9 @@ class ListManagerApp(tk.Tk):
         sel = self.lists_lb.curselection()
         if not sel:
             return
+        # Автосохранение текущего элемента перед переключением списка
+        if self.selected_element_id and self.current_list_id:
+            self.save_element(silent=True)
         self.current_list_id = list(self.manager.lists.keys())[sel[0]]
         self.selected_element_id = None
         self.clear_details()
@@ -423,18 +426,6 @@ class ListManagerApp(tk.Tk):
         self.load_element_details()
         # Сбрасываем индикатор несохранённых изменений после загрузки
         self.save_btn.config(bg="#e3f2fd", text="💾 Сохранить изменения")
-
-    def on_list_select(self, event=None):
-        sel = self.lists_lb.curselection()
-        if not sel:
-            return
-        # Автосохранение текущего элемента перед переключением списка
-        if self.selected_element_id and self.current_list_id:
-            self.save_element(silent=True)
-        self.current_list_id = list(self.manager.lists.keys())[sel[0]]
-        self.selected_element_id = None
-        self.clear_details()
-        self.refresh_tree()
 
     def add_list(self):
         name = simpledialog.askstring("Новый список", "Введите название списка:", parent=self)
