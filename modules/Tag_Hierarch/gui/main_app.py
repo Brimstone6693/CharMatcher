@@ -494,11 +494,16 @@ class ListManagerApp(tk.Tk):
         elem.name = self.name_var.get().strip()
         elem.description = self.desc_text.get("1.0", tk.END).strip()
 
-        # Статус уже был обновлён в _on_status_changed() при изменении combobox
-        # Здесь только переключаем между авто/ручным режимом
+        # Обработка статуса: если "Авто" включено - custom_status = None, иначе сохраняем выбранное значение
         if self.status_auto_var.get():
             elem.custom_status = None
-        # Если ручной режим - custom_status уже установлен в _on_status_changed()
+        else:
+            # В ручном режиме сохраняем значение из combobox как custom_status
+            try:
+                val = int(self.status_var.get())
+                elem.custom_status = max(-3, min(3, val))
+            except ValueError:
+                elem.custom_status = None
 
         self.manager._recalculate_states()
         self.refresh_tree()
