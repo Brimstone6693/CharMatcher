@@ -38,6 +38,45 @@ class Element:
 
     @classmethod
     def from_dict(cls, data: dict) -> "Element":
+        # Поддержка старых имен полей для обратной совместимости
+        status_raw = data.get("status", data.get("state", 0))
+        # Преобразуем строковые значения status в числа
+        if isinstance(status_raw, str):
+            status_map = {"active": 0, "blocked": -3, "pending": -1, "warning": 1}
+            status = status_map.get(status_raw.lower(), 0)
+        elif isinstance(status_raw, bool):
+            # False -> 0, True -> 1 (но это редкость)
+            status = 1 if status_raw else 0
+        else:
+            status = int(status_raw) if status_raw is not None else 0
+            
+        custom_status_raw = data.get("custom_status", data.get("custom_state"))
+        # custom_status=False означает None (авто режим)
+        if custom_status_raw is False:
+            custom_status = None
+        elif custom_status_raw is True:
+            custom_status = 0
+        elif isinstance(custom_status_raw, str):
+            status_map = {"active": 0, "blocked": -3, "pending": -1, "warning": 1}
+            custom_status = status_map.get(custom_status_raw.lower(), 0)
+        else:
+            custom_status = int(custom_status_raw) if custom_status_raw is not None else None
+        
+        # depends_on может быть списком (старый формат) или словарём {id: type} (новый формат)
+        depends_on_raw = data.get("depends_on", {})
+        if isinstance(depends_on_raw, list):
+            # Старый формат: просто список ID, предполагаем тип "LE" по умолчанию
+            depends_on = {dep_id: "LE" for dep_id in depends_on_raw}
+        else:
+            depends_on = depends_on_raw
+            
+        # depended_by может быть списком (старый формат) или словарём {id: type} (новый формат)
+        depended_by_raw = data.get("depended_by", {})
+        if isinstance(depended_by_raw, list):
+            depended_by = {dep_id: "LE" for dep_id in depended_by_raw}
+        else:
+            depended_by = depended_by_raw
+        
         return cls(
             name=data["name"],
             description=data.get("description", ""),
@@ -46,10 +85,10 @@ class Element:
             children_ids=data.get("children_ids", []),
             references=data.get("references", {}),
             referenced_by=data.get("referenced_by", []),
-            depends_on=data.get("depends_on", {}),
-            depended_by=data.get("depended_by", {}),
-            status=data.get("status", 0),
-            custom_status=data.get("custom_status"),
+            depends_on=depends_on,
+            depended_by=depended_by,
+            status=status,
+            custom_status=custom_status,
             metadata=data.get("metadata", {}),
         )
 
@@ -376,6 +415,8 @@ class ListManager:
         self._global_elements = data.get("global_elements", {})
         for lid, lst_data in data.get("lists", {}).items():
             self.lists[lid] = ItemList.from_dict(lst_data)
+        # Пересчитать статусы после загрузки
+        self._recalculate_states()
 
     def _remove_element_references(self, element_id: str):
         lid = self._global_elements.get(element_id)

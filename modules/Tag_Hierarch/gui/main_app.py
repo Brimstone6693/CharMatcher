@@ -147,6 +147,7 @@ class ListManagerApp(tk.Tk):
             width=5,
         )
         self.status_combo.pack(side="left", padx=5)
+        self.status_combo.bind("<<ComboboxSelected>>", self._on_status_changed)
 
         self.status_preview = tk.Label(manual_frame, text="→ Авто: 0", font=("Segoe UI", 9, "italic"))
         self.status_preview.pack(side="left", padx=5)
@@ -197,6 +198,15 @@ class ListManagerApp(tk.Tk):
             command=self.save_element, bg="#e3f2fd",
         ).pack(fill="x", padx=5, pady=10)
 
+    def _on_status_changed(self, event=None):
+        """Обработчик изменения статуса в combobox (ручной режим)."""
+        try:
+            val = int(self.status_var.get())
+            color = STATUS_COLORS.get(val, "#000")
+            self.status_preview.config(text=f"(ручной: {val})", fg=color)
+        except ValueError:
+            self.status_preview.config(text="(ручной)", fg="#000")
+
     def _on_auto_changed(self):
         if self.status_auto_var.get():
             self.status_combo.config(state="disabled")
@@ -215,14 +225,15 @@ class ListManagerApp(tk.Tk):
             if self.selected_element_id:
                 info = self.manager.get_element_info(self.selected_element_id)
                 if info:
-                    self.status_var.set(str(info['status']))
-            try:
-                val = int(self.status_var.get())
-                color = STATUS_COLORS.get(val, "#000")
-            except ValueError:
-                val = 0
-                color = "#000"
-            self.status_preview.config(text="(ручной)", fg=color)
+                    cs = info.get('custom_status')
+                    if cs is not None:
+                        # Элемент уже имел кастомный статус - восстанавливаем его
+                        self.status_var.set(str(cs))
+                        self.status_preview.config(text=f"(ручной: {cs})", fg=STATUS_COLORS.get(cs, "#000"))
+                    else:
+                        # Кастомного статуса не было - используем текущий авто-статус как начальное значение
+                        self.status_var.set(str(info['status']))
+                        self.status_preview.config(text=f"(ручной)", fg=STATUS_COLORS.get(info['status'], "#000"))
 
     def bind_events(self):
         self.lists_lb.bind("<<ListboxSelect>>", self.on_list_select)
@@ -332,8 +343,8 @@ class ListManagerApp(tk.Tk):
             self.status_auto_var.set(False)
             self.status_var.set(str(cs))
             self.status_combo.config(state="readonly")
-            # ИСПРАВЛЕНИЕ: используем цвет статуса для custom_status
-            self.status_preview.config(text="(ручной)", fg=STATUS_COLORS.get(cs, "#000"))
+            # Обновление превью с фактическим значением статуса
+            self.status_preview.config(text=f"(ручной: {cs})", fg=STATUS_COLORS.get(cs, "#000"))
 
         # Ссылки
         self.refs_lb.delete(0, tk.END)
@@ -475,7 +486,7 @@ class ListManagerApp(tk.Tk):
                 val = int(self.status_var.get())
                 elem.custom_status = max(-3, min(3, val))
             except ValueError:
-                elem.custom_status = 0
+                elem.custom_status = None  # Вместо 0 устанавливаем None (авто) при ошибке
 
         self.manager._recalculate_states()
         self.refresh_tree()
@@ -552,10 +563,13 @@ class ListManagerApp(tk.Tk):
         self.load_element_details()
 
     def save_file(self):
+        import os
+        # Используем относительный путь к папке data внутри модуля Tag_Hierarch
+        data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
         path = filedialog.asksaveasfilename(
             defaultextension=".json",
             filetypes=[("JSON", "*.json")],
-            initialdir="data",
+            initialdir=data_dir,
             initialfile="lists_data.json"
         )
         if path:
@@ -563,9 +577,12 @@ class ListManagerApp(tk.Tk):
             messagebox.showinfo("Сохранение", f"Данные сохранены в:\n{path}")
 
     def load_file(self):
+        import os
+        # Используем относительный путь к папке data внутри модуля Tag_Hierarch
+        data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
         path = filedialog.askopenfilename(
             filetypes=[("JSON", "*.json")],
-            initialdir="data"
+            initialdir=data_dir
         )
         if path:
             try:

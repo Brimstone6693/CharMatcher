@@ -5,27 +5,11 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Compiled and build artifacts
-*.o
-*.obj
-*.so
-*.a
-*.dll
-*.exe
-*.out
+# Data files that might be temporary/generated
+modules/Tag_Hierarch/data/lists_data.json
 
-# Dependencies
-.venv/
-venv/
-node_modules/
-.mypy_cache/
-.pytest_cache/
-
-# Logs and temp files
+# Logs
 *.log
-*.tmp
-*.swp
-*.swo
 
 # Environment
 .env
@@ -36,14 +20,7 @@ node_modules/
 .vscode/
 .idea/
 
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# Distribution
-dist/
-build/
-target/
-.gradle/
+# Dependencies
+venv/
+.venv/
 ```
