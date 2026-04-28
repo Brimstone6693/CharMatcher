@@ -38,6 +38,21 @@ STATUS_COLORS = {
     1: "#7cb342",
     2: "#388e3c",
     3: "#1b5e20",
+    None: "#9e9e9e",  # Для статуса "-" (отсутствие позиции)
+}
+
+# Веса для статусов: зеркальная логика - сила мнения важнее знака
+# 3 и -3 равнозначны по влиянию (максимум), 0 - нейтрально
+# 0 = нейтрально, 1 = нравится/не очень, 2 = обожаю/сильно не нравится, 3 = абсолютно без ума/категорически против
+STATUS_WEIGHTS = {
+    -3: 7,  # Категорически против (макс вес, зеркально к +3)
+    -2: 6,  # Сильно не нравится (зеркально к +2)
+    -1: 5,  # Не очень (зеркально к +1)
+    0: 4,   # Нейтрально
+    1: 5,   # Нравится
+    2: 6,   # Обожаю
+    3: 7,   # Абсолютно без ума (макс вес)
+    None: 0,  # Отсутствие позиции (минимальный вес)
 }
 
 
@@ -303,6 +318,17 @@ class ListManager:
             if not lid:
                 continue
             elem = self.lists[lid].elements[eid]
+            
+            # Проверяем полный ручной режим
+            if elem.metadata.get("manual_override", False):
+                # В полном ручном режиме используем custom_status напрямую, игнорируя зависимости
+                if elem.custom_status is not None:
+                    elem.status = max(-3, min(3, elem.custom_status))
+                else:
+                    elem.status = 0  # По умолчанию 0 если нет custom_status
+                continue
+            
+            # Обычный режим с зависимостями
             if elem.custom_status is not None:
                 elem.status = max(-3, min(3, elem.custom_status))
                 continue
@@ -313,24 +339,45 @@ class ListManager:
                 if parent_lid and elem.parent_id in self.lists[parent_lid].elements:
                     high = min(high, self.lists[parent_lid].elements[elem.parent_id].status)
 
+            # Собираем все ограничения от зависимостей с весами
+            constraints = []
             for dep_id, dep_type in elem.depends_on.items():
                 dep_lid = self._global_elements.get(dep_id)
                 if not dep_lid or dep_id not in self.lists[dep_lid].elements:
                     continue
-                s = self.lists[dep_lid].elements[dep_id].status
+                dep_elem = self.lists[dep_lid].elements[dep_id]
+                s = dep_elem.status
+                weight = STATUS_WEIGHTS.get(s, 4)  # Вес статуса зависимости
+                
                 if dep_type == "EQ":
-                    low = max(low, s)
-                    high = min(high, s)
+                    constraints.append((s, s, weight * 2))  # EQ имеет больший вес
                 elif dep_type == "PM1":
-                    low = max(low, s - 1)
-                    high = min(high, s + 1)
+                    constraints.append((max(-3, s - 1), min(3, s + 1), weight))
                 elif dep_type == "LE":
-                    high = min(high, s)
+                    constraints.append((low, s, weight))
                 elif dep_type == "GE":
-                    low = max(low, s)
+                    constraints.append((s, high, weight))
+            
+            # Применяем ограничения с учетом весов
+            if constraints:
+                # Сортируем по весу (от большего к меньшему)
+                constraints.sort(key=lambda x: x[2], reverse=True)
+                
+                # Применяем ограничения последовательно, начиная с самых влиятельных
+                for c_low, c_high, _ in constraints:
+                    low = max(low, c_low)
+                    high = min(high, c_high)
 
             if low > high:
-                elem.status = -3
+                # Конфликт ограничений - используем статус с наибольшим весом
+                best_status = 0
+                best_weight = STATUS_WEIGHTS.get(0, 4)
+                for status_val in range(-3, 4):
+                    w = STATUS_WEIGHTS.get(status_val, 4)
+                    if w > best_weight:
+                        best_weight = w
+                        best_status = status_val
+                elem.status = best_status
             else:
                 if low <= 0 <= high:
                     elem.status = 0
@@ -681,11 +728,12 @@ class ListManagerApp(tk.Tk):
 
         basic_frame.columnconfigure(1, weight=1)
 
-        # Статус (-3..+3) — ИСПРАВЛЕННЫЙ БЛОК
-        status_frame = tk.LabelFrame(right_frame, text="Статус (-3 … +3)")
+        # Статус (-3..+3 и "-") — ИСПРАВЛЕННЫЙ БЛОК
+        status_frame = tk.LabelFrame(right_frame, text="Статус (-3 … +3, -)")
         status_frame.pack(fill="x", padx=5, pady=5)
 
         self.status_auto_var = tk.BooleanVar(value=True)
+        self.status_manual_override_var = tk.BooleanVar(value=False)  # Второй чекбокс - полный ручной режим
         self.status_var = tk.StringVar(value="0")
 
         auto_cb = tk.Checkbutton(
@@ -695,6 +743,13 @@ class ListManagerApp(tk.Tk):
         )
         auto_cb.pack(anchor="w", padx=5, pady=(5, 0))
 
+        manual_cb = tk.Checkbutton(
+            status_frame, text="Полностью ручной (игнорировать зависимости)",
+            variable=self.status_manual_override_var,
+            command=self._on_manual_override_changed,
+        )
+        manual_cb.pack(anchor="w", padx=5, pady=(0, 5))
+
         manual_frame = tk.Frame(status_frame)
         manual_frame.pack(fill="x", padx=5, pady=5)
 
@@ -702,7 +757,7 @@ class ListManagerApp(tk.Tk):
         self.status_combo = ttk.Combobox(
             manual_frame,
             textvariable=self.status_var,
-            values=[str(i) for i in range(-3, 4)],
+            values=["-"] + [str(i) for i in range(-3, 4)],
             state="disabled",
             width=5,
         )
@@ -759,7 +814,9 @@ class ListManagerApp(tk.Tk):
 
     def _on_auto_changed(self):
         if self.status_auto_var.get():
+            # Авто режим включен - отключаем ручной комбобокс и скрываем чекбокс полного ручного режима
             self.status_combo.config(state="disabled")
+            self.status_manual_override_var.set(False)  # Сбрасываем полный ручной режим
             # Показать текущий рассчитанный статус
             if self.selected_element_id:
                 info = self.manager.get_element_info(self.selected_element_id)
@@ -777,6 +834,27 @@ class ListManagerApp(tk.Tk):
             except ValueError:
                 color = "#000"
             self.status_preview.config(text="(ручной)", fg=color)
+
+    def _on_manual_override_changed(self):
+        """Обработчик изменения полного ручного режима"""
+        if self.status_manual_override_var.get():
+            # Полный ручной режим - игнорируем зависимости
+            self.status_auto_var.set(False)  # Отключаем авто режим
+            self.status_combo.config(state="readonly")
+            self.status_preview.config(text="(полностью ручной)", fg="#9e9e9e")
+        else:
+            # Возвращаемся к обычному режиму (авто или обычный ручной)
+            if self.status_auto_var.get():
+                self.status_combo.config(state="disabled")
+                if self.selected_element_id:
+                    info = self.manager.get_element_info(self.selected_element_id)
+                    if info:
+                        self.status_preview.config(
+                            text=f"→ Авто: {info['status']}",
+                            fg=STATUS_COLORS.get(info["status"], "#000"),
+                        )
+            else:
+                self.status_combo.config(state="readonly")
 
     def bind_events(self):
         self.lists_lb.bind("<<ListboxSelect>>", self.on_list_select)
@@ -876,13 +954,24 @@ class ListManagerApp(tk.Tk):
         cs = info.get("custom_status")
         status_range = info.get("status_range", [])
         
+        # Проверяем, есть ли полный ручной режим в metadata
+        manual_override = info.get("metadata", {}).get("manual_override", False)
+        self.status_manual_override_var.set(manual_override)
+        
         # Обновляем значения в комбобоксе статуса на основе допустимого диапазона
-        if status_range:
-            self.status_combo.config(values=[str(i) for i in status_range])
+        if manual_override or status_range:
+            # В полном ручном режиме показываем все варианты
+            if manual_override:
+                self.status_combo.config(values=["-"] + [str(i) for i in range(-3, 4)])
+            elif status_range:
+                self.status_combo.config(values=[str(i) for i in status_range])
+            else:
+                self.status_combo.config(values=[])
         else:
             self.status_combo.config(values=[])
         
-        if cs is None:
+        if cs is None and not manual_override:
+            # Авто режим
             self.status_auto_var.set(True)
             self.status_var.set(str(info["status"]))
             self.status_combo.config(state="disabled")
@@ -892,11 +981,23 @@ class ListManagerApp(tk.Tk):
                 fg=STATUS_COLORS.get(info["status"], "#000"),
             )
         else:
+            # Ручной режим
             self.status_auto_var.set(False)
-            self.status_var.set(str(cs))
-            self.status_combo.config(state="readonly")
-            range_text = f"(ручной, доступно: {info.get('status_low', -3)}…{info.get('status_high', 3)})"
-            self.status_preview.config(text=range_text, fg=STATUS_COLORS.get(cs, "#000"))
+            if manual_override:
+                # Полный ручной - игнорируем диапазон
+                self.status_combo.config(state="readonly")
+                self.status_preview.config(text="(полностью ручной)", fg="#9e9e9e")
+            else:
+                # Обычный ручной с диапазоном
+                self.status_combo.config(state="readonly")
+                range_text = f"(ручной, доступно: {info.get('status_low', -3)}…{info.get('status_high', 3)})"
+                self.status_preview.config(text=range_text, fg=STATUS_COLORS.get(cs if cs is not None else 0, "#000"))
+            
+            # Устанавливаем значение статуса
+            if cs is not None:
+                self.status_var.set(str(cs))
+            else:
+                self.status_var.set("-")
 
         # Ссылки
         self.refs_lb.delete(0, tk.END)
@@ -1031,14 +1132,24 @@ class ListManagerApp(tk.Tk):
         elem.name = self.name_var.get().strip()
         elem.description = self.desc_text.get("1.0", tk.END).strip()
 
-        if self.status_auto_var.get():
+        # Сохраняем флаг полного ручного режима в metadata
+        elem.metadata["manual_override"] = self.status_manual_override_var.get()
+
+        if self.status_auto_var.get() and not self.status_manual_override_var.get():
+            # Авто режим - сбрасываем custom_status
             elem.custom_status = None
         else:
-            try:
-                val = int(self.status_var.get())
-                elem.custom_status = max(-3, min(3, val))
-            except ValueError:
-                elem.custom_status = 0
+            # Ручной режим (обычный или полный)
+            status_val = self.status_var.get()
+            if status_val == "-":
+                # Статус "-" означает отсутствие позиции
+                elem.custom_status = None  # None будет интерпретироваться как "-"
+            else:
+                try:
+                    val = int(status_val)
+                    elem.custom_status = max(-3, min(3, val))
+                except ValueError:
+                    elem.custom_status = None
 
         self.manager._recalculate_states()
         self.refresh_tree()
