@@ -179,6 +179,13 @@ class ListManagerApp(tk.Tk):
         self.status_preview = tk.Label(manual_frame, text="→ Авто: 0", font=("Segoe UI", 9, "italic"))
         self.status_preview.pack(side="left", padx=5)
 
+        # Сохранить (сразу после блока Статус)
+        self.save_btn = tk.Button(
+            status_frame, text="💾 Сохранить изменения",
+            command=self.save_element, bg="#e3f2fd",
+        )
+        self.save_btn.pack(fill="x", padx=5, pady=10)
+
         # Ссылки
         refs_frame = tk.LabelFrame(right_frame, text="Ссылки на элементы (взаимные)")
         refs_frame.pack(fill="both", expand=True, padx=5, pady=5)
@@ -218,13 +225,6 @@ class ListManagerApp(tk.Tk):
         self.rev_deps_lb = tk.Listbox(rev_deps_frame, yscrollcommand=rev_deps_scroll.set)
         self.rev_deps_lb.pack(fill="both", expand=True, padx=2, pady=2)
         rev_deps_scroll.config(command=self.rev_deps_lb.yview)
-
-        # Сохранить
-        self.save_btn = tk.Button(
-            right_frame, text="💾 Сохранить изменения",
-            command=self.save_element, bg="#e3f2fd",
-        )
-        self.save_btn.pack(fill="x", padx=5, pady=10)
 
     def _on_status_changed(self, event=None):
         """Обработчик изменения статуса в combobox (ручной режим)."""
