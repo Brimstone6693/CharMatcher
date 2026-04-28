@@ -113,11 +113,14 @@ class ListManagerApp(tk.Tk):
 
         tk.Label(basic_frame, text="Название:").grid(row=0, column=0, sticky="w", padx=5, pady=3)
         self.name_var = tk.StringVar()
-        tk.Entry(basic_frame, textvariable=self.name_var).grid(row=0, column=1, sticky="ew", padx=5, pady=3)
+        self.name_entry = tk.Entry(basic_frame, textvariable=self.name_var)
+        self.name_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=3)
+        self.name_var.trace_add("write", self._on_field_changed)
 
         tk.Label(basic_frame, text="Описание:").grid(row=1, column=0, sticky="nw", padx=5, pady=3)
         self.desc_text = tk.Text(basic_frame, height=3, wrap="word")
         self.desc_text.grid(row=1, column=1, sticky="ew", padx=5, pady=3)
+        self.desc_text.bind("<KeyRelease>", self._on_field_changed)
 
         basic_frame.columnconfigure(1, weight=1)
 
@@ -216,6 +219,8 @@ class ListManagerApp(tk.Tk):
             self.save_btn.config(bg="#bbdefb", text="💾 Сохранить изменения*")
         except ValueError:
             self.status_preview.config(text="(ручной)", fg="#000")
+        # Помечаем как изменённое
+        self._on_field_changed()
 
     def _on_auto_changed(self):
         if not self.selected_element_id or not self.current_list_id:
@@ -249,6 +254,13 @@ class ListManagerApp(tk.Tk):
                     elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
                     elem.custom_status = info['status']
                     self.status_preview.config(text=f"(ручной: {info['status']})", fg=STATUS_COLORS.get(info['status'], "#000"))
+        # Помечаем как изменённое
+        self._on_field_changed()
+
+    def _on_field_changed(self, *args):
+        """Вызывается при изменении любого поля элемента - подсвечивает кнопку сохранения."""
+        if self.selected_element_id and self.current_list_id:
+            self.save_btn.config(bg="#bbdefb", text="💾 Сохранить изменения*")
 
     def bind_events(self):
         self.lists_lb.bind("<<ListboxSelect>>", self.on_list_select)
@@ -409,6 +421,20 @@ class ListManagerApp(tk.Tk):
             self.save_element(silent=True)
         self.selected_element_id = sel[0]
         self.load_element_details()
+        # Сбрасываем индикатор несохранённых изменений после загрузки
+        self.save_btn.config(bg="#e3f2fd", text="💾 Сохранить изменения")
+
+    def on_list_select(self, event=None):
+        sel = self.lists_lb.curselection()
+        if not sel:
+            return
+        # Автосохранение текущего элемента перед переключением списка
+        if self.selected_element_id and self.current_list_id:
+            self.save_element(silent=True)
+        self.current_list_id = list(self.manager.lists.keys())[sel[0]]
+        self.selected_element_id = None
+        self.clear_details()
+        self.refresh_tree()
 
     def add_list(self):
         name = simpledialog.askstring("Новый список", "Введите название списка:", parent=self)
