@@ -193,14 +193,15 @@ class ListManagerApp(tk.Tk):
         rev_deps_scroll.config(command=self.rev_deps_lb.yview)
 
         # Сохранить
-        tk.Button(
+        self.save_btn = tk.Button(
             right_frame, text="💾 Сохранить изменения",
             command=self.save_element, bg="#e3f2fd",
-        ).pack(fill="x", padx=5, pady=10)
+        )
+        self.save_btn.pack(fill="x", padx=5, pady=10)
 
     def _on_status_changed(self, event=None):
         """Обработчик изменения статуса в combobox (ручной режим)."""
-        if not self.selected_element_id:
+        if not self.selected_element_id or not self.current_list_id:
             return
         try:
             val = int(self.status_var.get())
@@ -211,12 +212,16 @@ class ListManagerApp(tk.Tk):
             self.refresh_tree()
             color = STATUS_COLORS.get(val, "#000")
             self.status_preview.config(text=f"(ручной: {val})", fg=color)
+            # Визуально подсветим кнопку сохранения, чтобы показать, что есть несохранённые изменения
+            self.save_btn.config(bg="#bbdefb", text="💾 Сохранить изменения*")
         except ValueError:
             self.status_preview.config(text="(ручной)", fg="#000")
 
     def _on_auto_changed(self):
         if not self.selected_element_id or not self.current_list_id:
             return
+        # Подсветим кнопку сохранения, так как режим изменился
+        self.save_btn.config(bg="#bbdefb", text="💾 Сохранить изменения*")
         if self.status_auto_var.get():
             self.status_combo.config(state="disabled")
             # Показать текущий рассчитанный статус
@@ -240,7 +245,10 @@ class ListManagerApp(tk.Tk):
                 else:
                     # Кастомного статуса не было - используем текущий авто-статус как начальное значение
                     self.status_var.set(str(info['status']))
-                    self.status_preview.config(text=f"(ручной)", fg=STATUS_COLORS.get(info['status'], "#000"))
+                    # Сразу записываем это значение как custom_status, чтобы оно сохранилось при нажатии кнопки
+                    elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
+                    elem.custom_status = info['status']
+                    self.status_preview.config(text=f"(ручной: {info['status']})", fg=STATUS_COLORS.get(info['status'], "#000"))
 
     def bind_events(self):
         self.lists_lb.bind("<<ListboxSelect>>", self.on_list_select)
@@ -495,6 +503,8 @@ class ListManagerApp(tk.Tk):
         self.manager._recalculate_states()
         self.refresh_tree()
         self.load_element_details()
+        # Сбросим индикатор несохранённых изменений
+        self.save_btn.config(bg="#e3f2fd", text="💾 Сохранить изменения")
         messagebox.showinfo("Готово", "Изменения сохранены")
 
     def create_link(self):
