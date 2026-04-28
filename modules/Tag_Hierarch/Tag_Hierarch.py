@@ -723,14 +723,32 @@ class ListManagerApp(tk.Tk):
     def create_menu(self):
         menubar = tk.Menu(self)
         file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Новый проект", command=self.new_file, accelerator="Ctrl+N")
+        file_menu.add_command(label="Открыть", command=self.load_file, accelerator="Ctrl+O")
         file_menu.add_command(label="Сохранить", command=self.save_file, accelerator="Ctrl+S")
-        file_menu.add_command(label="Загрузить", command=self.load_file, accelerator="Ctrl+O")
         file_menu.add_separator()
         file_menu.add_command(label="Выход", command=self.quit)
         menubar.add_cascade(label="Файл", menu=file_menu)
         self.config(menu=menubar)
-        self.bind("<Control-s>", lambda e: self.save_file())
+        self.bind("<Control-n>", lambda e: self.new_file())
         self.bind("<Control-o>", lambda e: self.load_file())
+        self.bind("<Control-s>", lambda e: self.save_file())
+
+    def new_file(self):
+        if self.manager.lists and not messagebox.askyesno(
+            "Новый проект",
+            "Текущие несохранённые данные будут потеряны. Создать новый проект?",
+            parent=self
+        ):
+            return
+        # Очищаем менеджер
+        self.manager = ListManager()
+        self.current_list_id = None
+        self.selected_element_id = None
+        self.clear_details()
+        self.refresh_lists()
+        self.refresh_tree()
+        messagebox.showinfo("Новый проект", "Создан новый пустой проект")
 
     def create_ui(self):
         main_paned = tk.PanedWindow(self, orient=tk.HORIZONTAL)
