@@ -404,6 +404,9 @@ class ListManagerApp(tk.Tk):
         sel = self.tree.selection()
         if not sel:
             return
+        # Автосохранение текущего элемента перед переключением
+        if self.selected_element_id and self.current_list_id:
+            self.save_element(silent=True)
         self.selected_element_id = sel[0]
         self.load_element_details()
 
@@ -486,7 +489,7 @@ class ListManagerApp(tk.Tk):
         self.clear_details()
         self.refresh_tree()
 
-    def save_element(self):
+    def save_element(self, silent=False):
         if not self.selected_element_id or not self.current_list_id:
             return
         elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
@@ -510,7 +513,8 @@ class ListManagerApp(tk.Tk):
         self.load_element_details()
         # Сбросим индикатор несохранённых изменений
         self.save_btn.config(bg="#e3f2fd", text="💾 Сохранить изменения")
-        messagebox.showinfo("Готово", "Изменения сохранены")
+        if not silent:
+            messagebox.showinfo("Готово", "Изменения сохранены")
 
     def create_link(self):
         if not self.selected_element_id:
