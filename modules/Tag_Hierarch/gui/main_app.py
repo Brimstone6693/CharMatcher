@@ -104,8 +104,32 @@ class ListManagerApp(tk.Tk):
             self.tree.tag_configure(f"st{val}", foreground=color, font=("Segoe UI", 9, weight))
 
         # --- Правая панель: Свойства ---
-        right_frame = tk.LabelFrame(main_paned, text="Свойства элемента", width=420)
-        main_paned.add(right_frame, minsize=400)
+        right_container = tk.Frame(main_paned)
+        main_paned.add(right_container, minsize=400)
+
+        # Canvas с прокруткой для правой панели
+        right_canvas = tk.Canvas(right_container, highlightthickness=0)
+        right_scrollbar = ttk.Scrollbar(right_container, orient="vertical", command=right_canvas.yview)
+        self.scrollable_right_frame = tk.Frame(right_canvas)
+
+        self.scrollable_right_frame.bind(
+            "<Configure>",
+            lambda e: right_canvas.configure(scrollregion=right_canvas.bbox("all"))
+        )
+
+        right_canvas.create_window((0, 0), window=self.scrollable_right_frame, anchor="nw")
+        right_canvas.configure(yscrollcommand=right_scrollbar.set)
+
+        right_canvas.pack(side="left", fill="both", expand=True)
+        right_scrollbar.pack(side="right", fill="y")
+
+        # Привязка прокрутки колёсиком мыши
+        def _on_mousewheel(event):
+            right_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        right_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        right_frame = self.scrollable_right_frame
+        right_frame.config(width=380)
 
         # Основное
         basic_frame = tk.LabelFrame(right_frame, text="Основное")
