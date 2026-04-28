@@ -41,19 +41,29 @@ STATUS_COLORS = {
     None: "#9e9e9e",  # Для статуса "-" (отсутствие позиции)
 }
 
-# Веса для статусов: зеркальная логика - сила мнения важнее знака
-# 3 и -3 равнозначны по влиянию (максимум), 0 - нейтрально
-# 0 = нейтрально, 1 = нравится/не очень, 2 = обожаю/сильно не нравится, 3 = абсолютно без ума/категорически против
-STATUS_WEIGHTS = {
-    -3: 7,  # Категорически против (макс вес, зеркально к +3)
-    -2: 6,  # Сильно не нравится (зеркально к +2)
-    -1: 5,  # Не очень (зеркально к +1)
-    0: 4,   # Нейтрально
-    1: 5,   # Нравится
-    2: 6,   # Обожаю
-    3: 7,   # Абсолютно без ума (макс вес)
-    None: 0,  # Отсутствие позиции (минимальный вес)
+# Базовые веса статусов: -5 -3 -1 0 1 3 5
+# Отражает "силу мнения": чем больше модуль, тем увереннее позиция
+BASE_WEIGHTS = {
+    -3: -5,  # Категорически против
+    -2: -3,  # Сильно не нравится
+    -1: -1,  # Не очень
+    0: 0,    # Нейтрально
+    1: 1,    # Нравится
+    2: 3,    # Обожаю
+    3: 5,    # Абсолютно без ума
+    None: 0, # Отсутствие позиции (не влияет)
 }
+
+def get_status_weight(status: Optional[int]) -> int:
+    """Возвращает базовый вес статуса (может быть отрицательным)."""
+    return BASE_WEIGHTS.get(status, 0)
+
+def calculate_constraint_strength(statuses: List[int]) -> float:
+    """Вычисляет силу ограничения как среднее арифметическое абсолютных значений базовых весов."""
+    if not statuses:
+        return 0.0
+    total = sum(abs(BASE_WEIGHTS.get(s, 0)) for s in statuses)
+    return total / len(statuses)
 
 
 # ==================== МОДЕЛЬ ДАННЫХ ====================
@@ -292,6 +302,16 @@ class ListManager:
         self._recalculate_states()
 
     def _recalculate_states(self):
+        """
+        Пересчитывает статусы всех элементов с использованием новой системы весов.
+        
+        Алгоритм:
+        1. Топологическая сортировка для учёта зависимостей
+        2. Для каждого элемента:
+           - Если полный ручной режим -> используем custom_status напрямую
+           - Если есть custom_status (но не ручной режим) -> используем его
+           - Иначе вычисляем статус через агрегацию ограничений
+        """
         visited, temp_mark, order = set(), set(), []
 
         def visit(eid):
@@ -321,11 +341,10 @@ class ListManager:
             
             # Проверяем полный ручной режим
             if elem.metadata.get("manual_override", False):
-                # В полном ручном режиме используем custom_status напрямую, игнорируя зависимости
                 if elem.custom_status is not None:
                     elem.status = max(-3, min(3, elem.custom_status))
                 else:
-                    elem.status = 0  # По умолчанию 0 если нет custom_status
+                    elem.status = 0
                 continue
             
             # Обычный режим с зависимостями
@@ -333,58 +352,119 @@ class ListManager:
                 elem.status = max(-3, min(3, elem.custom_status))
                 continue
 
-            low, high = -3, 3
+            # Собираем все ограничения от зависимостей
+            constraints = []
+            
+            # Ограничение от родителя (LE по умолчанию)
             if elem.parent_id:
                 parent_lid = self._global_elements.get(elem.parent_id)
                 if parent_lid and elem.parent_id in self.lists[parent_lid].elements:
-                    high = min(high, self.lists[parent_lid].elements[elem.parent_id].status)
+                    parent_status = self.lists[parent_lid].elements[elem.parent_id].status
+                    # Диапазон [-3, parent_status], сила = |среднее весов от -3 до parent_status|
+                    statuses_range = list(range(-3, parent_status + 1))
+                    strength = calculate_constraint_strength(statuses_range)
+                    constraints.append({
+                        'low': -3,
+                        'high': parent_status,
+                        'strength': strength
+                    })
 
-            # Собираем все ограничения от зависимостей с весами
-            constraints = []
+            # Ограничения от зависимостей
             for dep_id, dep_type in elem.depends_on.items():
                 dep_lid = self._global_elements.get(dep_id)
                 if not dep_lid or dep_id not in self.lists[dep_lid].elements:
                     continue
                 dep_elem = self.lists[dep_lid].elements[dep_id]
                 s = dep_elem.status
-                weight = STATUS_WEIGHTS.get(s, 4)  # Вес статуса зависимости
+                
+                if s is None:
+                    # Если у зависимости нет статуса (None), пропускаем
+                    continue
                 
                 if dep_type == "EQ":
-                    constraints.append((s, s, weight * 2))  # EQ имеет больший вес
+                    # Диапазон {s}, сила = |BASE_WEIGHTS[s]|
+                    strength = abs(BASE_WEIGHTS.get(s, 0))
+                    constraints.append({
+                        'low': s,
+                        'high': s,
+                        'strength': strength
+                    })
+                    
                 elif dep_type == "PM1":
-                    constraints.append((max(-3, s - 1), min(3, s + 1), weight))
-                elif dep_type == "LE":
-                    constraints.append((low, s, weight))
+                    # Диапазон [max(-3, s-1), min(3, s+1)]
+                    low_bound = max(-3, s - 1)
+                    high_bound = min(3, s + 1)
+                    # Сила: если s = -3 или s = 3 -> 4, иначе |BASE_WEIGHTS[s]|
+                    if s == -3 or s == 3:
+                        strength = 4
+                    else:
+                        strength = abs(BASE_WEIGHTS.get(s, 0))
+                    constraints.append({
+                        'low': low_bound,
+                        'high': high_bound,
+                        'strength': strength
+                    })
+                    
                 elif dep_type == "GE":
-                    constraints.append((s, high, weight))
+                    # Диапазон [s, 3], сила = |среднее весов от s до 3|
+                    if s is not None:
+                        statuses_range = list(range(s, 4))
+                        strength = calculate_constraint_strength(statuses_range)
+                        constraints.append({
+                            'low': s,
+                            'high': 3,
+                            'strength': strength
+                        })
+                    
+                elif dep_type == "LE":
+                    # Диапазон [-3, s], сила = |среднее весов от -3 до s|
+                    if s is not None:
+                        statuses_range = list(range(-3, s + 1))
+                        strength = calculate_constraint_strength(statuses_range)
+                        constraints.append({
+                            'low': -3,
+                            'high': s,
+                            'strength': strength
+                        })
             
-            # Применяем ограничения с учетом весов
-            if constraints:
-                # Сортируем по весу (от большего к меньшему)
-                constraints.sort(key=lambda x: x[2], reverse=True)
-                
-                # Применяем ограничения последовательно, начиная с самых влиятельных
-                for c_low, c_high, _ in constraints:
-                    low = max(low, c_low)
-                    high = min(high, c_high)
-
-            if low > high:
-                # Конфликт ограничений - используем статус с наибольшим весом
-                best_status = 0
-                best_weight = STATUS_WEIGHTS.get(0, 4)
-                for status_val in range(-3, 4):
-                    w = STATUS_WEIGHTS.get(status_val, 4)
-                    if w > best_weight:
-                        best_weight = w
-                        best_status = status_val
-                elem.status = best_status
+            # Агрегация: расчёт Score для каждого статуса
+            if not constraints:
+                # Нет ограничений -> статус 0 (нейтрально)
+                elem.status = 0
+                continue
+            
+            # Вычисляем Score для каждого возможного статуса
+            scores = {}
+            for status_val in range(-3, 4):
+                score = 0.0
+                for constraint in constraints:
+                    if constraint['low'] <= status_val <= constraint['high']:
+                        score += constraint['strength']
+                scores[status_val] = score
+            
+            # Находим максимальный Score
+            max_score = max(scores.values())
+            candidates = [s for s, sc in scores.items() if sc == max_score]
+            
+            if len(candidates) == 1:
+                elem.status = candidates[0]
             else:
-                if low <= 0 <= high:
-                    elem.status = 0
-                elif high < 0:
-                    elem.status = high
-                else:
-                    elem.status = low
+                # Tie-breaking:
+                # 1. Предпочитаем статус с большим |BASE_WEIGHTS[status]|
+                # 2. При равенстве - положительный статус
+                best_status = None
+                best_abs_weight = -1
+                for s in candidates:
+                    abs_weight = abs(BASE_WEIGHTS.get(s, 0))
+                    if abs_weight > best_abs_weight:
+                        best_abs_weight = abs_weight
+                        best_status = s
+                    elif abs_weight == best_abs_weight:
+                        # При равенстве модулей весов выбираем положительный или нейтральный
+                        if best_status is None or s > best_status:
+                            best_status = s
+                
+                elem.status = best_status if best_status is not None else 0
 
     def get_element_info(self, element_id: str) -> Optional[dict]:
         lid = self._global_elements.get(element_id)
