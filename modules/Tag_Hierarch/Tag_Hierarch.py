@@ -348,6 +348,33 @@ class ListManager:
         info["list_id"] = lid
         info["list_name"] = self.lists[lid].name
 
+        # Вычисляем допустимый диапазон статусов
+        low, high = -3, 3
+        if elem.parent_id:
+            parent_lid = self._global_elements.get(elem.parent_id)
+            if parent_lid and elem.parent_id in self.lists[parent_lid].elements:
+                high = min(high, self.lists[parent_lid].elements[elem.parent_id].status)
+
+        for dep_id, dep_type in elem.depends_on.items():
+            dep_lid = self._global_elements.get(dep_id)
+            if not dep_lid or dep_id not in self.lists[dep_lid].elements:
+                continue
+            s = self.lists[dep_lid].elements[dep_id].status
+            if dep_type == "EQ":
+                low = max(low, s)
+                high = min(high, s)
+            elif dep_type == "PM1":
+                low = max(low, s - 1)
+                high = min(high, s + 1)
+            elif dep_type == "LE":
+                high = min(high, s)
+            elif dep_type == "GE":
+                low = max(low, s)
+
+        info["status_low"] = low
+        info["status_high"] = high
+        info["status_range"] = list(range(max(-3, low), min(3, high) + 1)) if low <= high else []
+
         info["resolved_references"] = []
         for ref_id, ref_data in elem.references.items():
             ref_lid = self._global_elements.get(ref_id)
@@ -847,19 +874,29 @@ class ListManagerApp(tk.Tk):
         self.desc_text.insert("1.0", info.get("description", ""))
 
         cs = info.get("custom_status")
+        status_range = info.get("status_range", [])
+        
+        # Обновляем значения в комбобоксе статуса на основе допустимого диапазона
+        if status_range:
+            self.status_combo.config(values=[str(i) for i in status_range])
+        else:
+            self.status_combo.config(values=[])
+        
         if cs is None:
             self.status_auto_var.set(True)
             self.status_var.set(str(info["status"]))
             self.status_combo.config(state="disabled")
+            range_text = f"→ Авто: {info['status']} (доступно: {info.get('status_low', -3)}…{info.get('status_high', 3)})"
             self.status_preview.config(
-                text=f"→ Авто: {info['status']}",
+                text=range_text,
                 fg=STATUS_COLORS.get(info["status"], "#000"),
             )
         else:
             self.status_auto_var.set(False)
             self.status_var.set(str(cs))
             self.status_combo.config(state="readonly")
-            self.status_preview.config(text="(ручной)", fg=STATUS_COLORS.get(cs, "#000"))
+            range_text = f"(ручной, доступно: {info.get('status_low', -3)}…{info.get('status_high', 3)})"
+            self.status_preview.config(text=range_text, fg=STATUS_COLORS.get(cs, "#000"))
 
         # Ссылки
         self.refs_lb.delete(0, tk.END)
