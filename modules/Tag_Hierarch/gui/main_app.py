@@ -155,6 +155,17 @@ class ListManagerApp(tk.Tk):
         status_frame.pack(fill="x", padx=5, pady=5)
 
         self.status_var = tk.StringVar(value="0")
+        self.manual_override_var = tk.BooleanVar(value=False)
+
+        # Чекбокс "Ручная настройка" (полное переопределение)
+        self.manual_override_cb = tk.Checkbutton(
+            status_frame,
+            text="🔓 Ручная настройка (игнорировать зависимости)",
+            variable=self.manual_override_var,
+            command=self._on_manual_override_changed,
+            anchor="w",
+        )
+        self.manual_override_cb.pack(fill="x", padx=5, pady=(5, 0))
 
         manual_frame = tk.Frame(status_frame)
         manual_frame.pack(fill="x", padx=5, pady=5)
@@ -164,12 +175,11 @@ class ListManagerApp(tk.Tk):
             manual_frame,
             textvariable=self.status_var,
             values=[str(i) for i in range(-3, 4)],
-            state="normal",  # Разрешён ручной ввод
+            state="readonly",  # Только выбор из списка
             width=5,
         )
         self.status_combo.pack(side="left", padx=5)
         self.status_combo.bind("<<ComboboxSelected>>", self._on_status_changed)
-        self.status_combo.bind("<KeyRelease>", self._on_status_key_release)
 
         self.status_preview = tk.Label(manual_frame, text="→ Авто: 0", font=("Segoe UI", 9, "italic"))
         self.status_preview.pack(side="left", padx=5)
@@ -222,47 +232,81 @@ class ListManagerApp(tk.Tk):
         rev_deps_scroll.config(command=self.rev_deps_lb.yview)
 
     def _on_status_key_release(self, event=None):
-        """Обработчик ручного ввода статуса через клавиатуру."""
+        """Обработчик ручного ввода статуса через клавиатуру (удалено - combobox теперь readonly)."""
+        pass
+
+    def _on_manual_override_changed(self):
+        """Обработчик изменения чекбокса 'Ручная настройка'."""
         if not self.selected_element_id or not self.current_list_id:
             return
-        try:
-            val = int(self.status_var.get())
-            # Проверяем диапазон
-            if -3 <= val <= 3:
-                elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
+        
+        elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
+        
+        if self.manual_override_var.get():
+            # Включаем полный ручной режим - игнорирование зависимостей
+            elem.metadata["manual_override"] = True
+            # Устанавливаем текущее значение из combobox как custom_status
+            try:
+                val = int(self.status_var.get())
                 elem.custom_status = max(-3, min(3, val))
-                self.manager._recalculate_states()
-                self.refresh_tree()
-                color = STATUS_COLORS.get(val, "#000")
-                self.update_edit_indicator()
-            else:
-                self.status_preview.config(text="(вне диапазона)", fg="#f44336")
-        except ValueError:
-            self.status_preview.config(text="(неверное значение)", fg="#f44336")
+            except ValueError:
+                elem.custom_status = 0
+            self.status_combo.config(state="readonly")
+        else:
+            # Выключаем ручной режим - возвращаемся к автоматическому расчёту
+            elem.metadata["manual_override"] = False
+            elem.custom_status = None
+            self.status_combo.config(state="readonly")
+        
+        self.manager._recalculate_states()
+        self.refresh_tree()
+        self.update_edit_indicator()
         self._on_field_changed()
 
     def _on_status_changed(self, event=None):
-        """Обработчик изменения статуса в combobox (ручной режим)."""
+        """Обработчик изменения статуса в combobox."""
         if not self.selected_element_id or not self.current_list_id:
             return
         try:
             val = int(self.status_var.get())
             # Немедленно обновляем статус в модели для предпросмотра
             elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
-            elem.custom_status = max(-3, min(3, val))
+            
+            if self.manual_override_var.get():
+                # Полный ручной режим - игнорируем зависимости
+                elem.custom_status = max(-3, min(3, val))
+            else:
+                # Обычное редактирование с зависимостями
+                elem.custom_status = max(-3, min(3, val))
+            
             self.manager._recalculate_states()
             self.refresh_tree()
-            color = STATUS_COLORS.get(val, "#000")
             self.update_edit_indicator()
         except ValueError:
-            self.status_preview.config(text="(ручной)", fg="#000")
+            self.status_preview.config(text="(неверное)", fg="#f44336")
         # Помечаем как изменённое
         self._on_field_changed()
 
     def _on_field_changed(self, *args):
         """Вызывается при изменении любого поля элемента - подсвечивает кнопку сохранения."""
         if self.selected_element_id and self.current_list_id:
-            self.save_btn.config(bg="#bbdefb", text="💾 Сохранить изменения*")
+            elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
+            has_custom = elem.custom_status is not None
+            has_deps = len(elem.depends_on) > 0
+            is_manual_override = elem.metadata.get("manual_override", False)
+            
+            if is_manual_override:
+                # Полный ручной режим (игнорирование зависимостей) - **
+                self.save_btn.config(bg="#ffcdd2", text="💾 Сохранить изменения**")
+            elif has_custom and has_deps:
+                # Ручной статус при наличии зависимостей - **
+                self.save_btn.config(bg="#ffcdd2", text="💾 Сохранить изменения**")
+            elif has_custom:
+                # Просто ручное редактирование без зависимостей - *
+                self.save_btn.config(bg="#bbdefb", text="💾 Сохранить изменения*")
+            else:
+                # Автоматический режим - без метки
+                self.save_btn.config(bg="#e3f2fd", text="💾 Сохранить изменения")
 
     def update_edit_indicator(self):
         """Обновляет индикатор редактирования (* или **) на основе состояния элемента."""
@@ -276,23 +320,31 @@ class ListManagerApp(tk.Tk):
         # Проверяем, есть ли зависимости у элемента
         has_dependencies = len(elem.depends_on) > 0
         
-        if has_custom_status:
+        # Проверяем полный ручной режим
+        is_manual_override = elem.metadata.get("manual_override", False)
+        
+        # Обновляем состояние чекбокса
+        self.manual_override_var.set(is_manual_override)
+        
+        if is_manual_override:
+            # Полный ручной режим - игнорирование зависимостей (**)
+            self.element_edit_state = "overridden"
+            self.status_preview.config(text=f"(ручной: {elem.custom_status}) **", 
+                                       fg=STATUS_COLORS.get(elem.custom_status, "#000"))
+        elif has_custom_status:
             if has_dependencies:
                 # Есть и ручной статус и зависимости - полное переопределение (**)
                 self.element_edit_state = "overridden"
-                self.save_btn.config(text="💾 Сохранить изменения**")
                 self.status_preview.config(text=f"(ручной: {elem.custom_status}) **", 
                                            fg=STATUS_COLORS.get(elem.custom_status, "#000"))
             else:
                 # Только ручной статус без зависимостей - редактирование (*)
                 self.element_edit_state = "edited"
-                self.save_btn.config(text="💾 Сохранить изменения*")
-                self.status_preview.config(text=f"(ручной: {elem.custom_status})", 
+                self.status_preview.config(text=f"(ручной: {elem.custom_status})*", 
                                            fg=STATUS_COLORS.get(elem.custom_status, "#000"))
         else:
             # Автоматический режим
             self.element_edit_state = None
-            self.save_btn.config(text="💾 Сохранить изменения")
             info = self.manager.get_element_info(self.selected_element_id)
             if info:
                 self.status_preview.config(text=f"→ Авто: {info['status']}", 
@@ -372,7 +424,8 @@ class ListManagerApp(tk.Tk):
         self.name_var.set("")
         self.desc_text.delete("1.0", tk.END)
         self.status_var.set("0")
-        self.status_combo.config(state="normal")  # Разрешён ручной ввод
+        self.manual_override_var.set(False)
+        self.status_combo.config(state="readonly")
         self.status_preview.config(text="→ Авто: 0", fg="#616161")
         self.refs_lb.delete(0, tk.END)
         self.deps_lb.delete(0, tk.END)
@@ -393,25 +446,39 @@ class ListManagerApp(tk.Tk):
         self.desc_text.delete("1.0", tk.END)
         self.desc_text.insert("1.0", info.get("description", ""))
 
+        # Получаем элемент для проверки manual_override
+        elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
+        is_manual_override = elem.metadata.get("manual_override", False)
+        
+        # Устанавливаем состояние чекбокса
+        self.manual_override_var.set(is_manual_override)
+        
         cs = info.get("custom_status")
-        # Всегда включаем ручной режим с combobox
-        self.status_combo.config(state="normal")  # Разрешён ручной ввод
-        if cs is None:
-            # Нет ручного статуса - показываем авто-статус
-            self.status_var.set(str(info["status"]))
+        self.status_combo.config(state="readonly")
+        
+        if is_manual_override:
+            # Полный ручной режим - игнорирование зависимостей
+            self.status_var.set(str(cs) if cs is not None else "0")
             self.status_preview.config(
-                text=f"→ Авто: {info['status']}",
-                fg=STATUS_COLORS.get(info["status"], "#000"),
+                text=f"(ручной: {cs}) **",
+                fg=STATUS_COLORS.get(cs, "#000"),
             )
-        else:
-            # Есть ручной статус
+        elif cs is not None:
+            # Есть ручной статус (но не полный ручной режим)
             self.status_var.set(str(cs))
             # Обновление превью с фактическим значением статуса и индикатором
             has_dependencies = len(info.get("resolved_dependencies", [])) > 0
             if has_dependencies:
                 self.status_preview.config(text=f"(ручной: {cs}) **", fg=STATUS_COLORS.get(cs, "#000"))
             else:
-                self.status_preview.config(text=f"(ручной: {cs})", fg=STATUS_COLORS.get(cs, "#000"))
+                self.status_preview.config(text=f"(ручной: {cs})*", fg=STATUS_COLORS.get(cs, "#000"))
+        else:
+            # Нет ручного статуса - показываем авто-статус
+            self.status_var.set(str(info["status"]))
+            self.status_preview.config(
+                text=f"→ Авто: {info['status']}",
+                fg=STATUS_COLORS.get(info["status"], "#000"),
+            )
 
         # Ссылки
         self.refs_lb.delete(0, tk.END)
