@@ -160,7 +160,7 @@ class ListManagerApp(tk.Tk):
         self.save_btn.pack(fill="x", padx=5, pady=10)
 
         # Ссылки
-        self.refs_panel = ReferencesPanel(right_frame, text="Ссылки на элементы (взаимные)")
+        self.refs_panel = ReferencesPanel(right_frame, title="Ссылки на элементы (взаимные)")
         self.refs_panel.pack(fill="both", expand=True, padx=5, pady=5)
         self.refs_panel.add_command = self.add_reference
         self.refs_panel.remove_command = self.remove_reference
@@ -322,3 +322,4 @@ class ListManagerApp(tk.Tk):
 
 if __name__ == "__main__":
     app = ListManagerApp()
+    app.root.mainloop()
