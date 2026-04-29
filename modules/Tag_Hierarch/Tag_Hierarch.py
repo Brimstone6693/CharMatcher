@@ -827,48 +827,35 @@ class ListManagerApp(tk.Tk):
         basic_frame.columnconfigure(1, weight=1)
 
         # Статус (-3..+3 и "-") — ИСПРАВЛЕННЫЙ БЛОК
-        status_frame = tk.LabelFrame(right_frame, text="Статус (-3 … +3, -)")
+        status_frame = tk.LabelFrame(right_frame, text="Статус (-3 … +3)")
         status_frame.pack(fill="x", padx=5, pady=5)
 
-        self.status_auto_var = tk.BooleanVar(value=True)
-        self.status_manual_override_var = tk.BooleanVar(value=False)  # Второй чекбокс - полный ручной режим
         self.status_var = tk.StringVar(value="0")
-
-        auto_cb = tk.Checkbutton(
-            status_frame, text="Авто (наследуется от зависимостей)",
-            variable=self.status_auto_var,
-            command=self._on_auto_changed,
-        )
-        auto_cb.pack(anchor="w", padx=5, pady=(5, 0))
-
-        manual_cb = tk.Checkbutton(
-            status_frame, text="Полностью ручной (игнорировать зависимости)",
-            variable=self.status_manual_override_var,
-            command=self._on_manual_override_changed,
-        )
-        manual_cb.pack(anchor="w", padx=5, pady=(0, 5))
 
         manual_frame = tk.Frame(status_frame)
         manual_frame.pack(fill="x", padx=5, pady=5)
 
-        tk.Label(manual_frame, text="Ручной:").pack(side="left")
+        tk.Label(manual_frame, text="Значение:").pack(side="left")
         self.status_combo = ttk.Combobox(
             manual_frame,
             textvariable=self.status_var,
-            values=["-"] + [str(i) for i in range(-3, 4)],
-            state="disabled",
+            values=[str(i) for i in range(-3, 4)],
+            state="normal",  # Разрешаем ручной ввод
             width=5,
         )
         self.status_combo.pack(side="left", padx=5)
+        self.status_combo.bind("<<ComboboxSelected>>", self._on_status_changed)
+        self.status_combo.bind("<KeyRelease>", self._on_status_changed)
 
-        self.status_preview = tk.Label(manual_frame, text="→ Авто: 0", font=("Segoe UI", 9, "italic"))
+        self.status_preview = tk.Label(manual_frame, text="", font=("Segoe UI", 9, "italic"))
         self.status_preview.pack(side="left", padx=5)
 
         # Кнопка Сохранить — сразу под статусом
-        tk.Button(
+        self.save_btn = tk.Button(
             status_frame, text="💾 Сохранить изменения",
             command=self.save_element, bg="#e3f2fd",
-        ).pack(fill="x", padx=5, pady=5)
+        )
+        self.save_btn.pack(fill="x", padx=5, pady=5)
 
         # Ссылки
         refs_frame = tk.LabelFrame(right_frame, text="Ссылки на элементы (взаимные)")
@@ -910,49 +897,30 @@ class ListManagerApp(tk.Tk):
         self.rev_deps_lb.pack(fill="both", expand=True, padx=2, pady=2)
         rev_deps_scroll.config(command=self.rev_deps_lb.yview)
 
-    def _on_auto_changed(self):
-        if self.status_auto_var.get():
-            # Авто режим включен - отключаем ручной комбобокс и скрываем чекбокс полного ручного режима
-            self.status_combo.config(state="disabled")
-            self.status_manual_override_var.set(False)  # Сбрасываем полный ручной режим
-            # Показать текущий рассчитанный статус
-            if self.selected_element_id:
-                info = self.manager.get_element_info(self.selected_element_id)
-                if info:
-                    self.status_preview.config(
-                        text=f"→ Авто: {info['status']}",
-                        fg=STATUS_COLORS.get(info["status"], "#000"),
-                    )
-        else:
-            self.status_combo.config(state="readonly")
-            # При переключении в ручной режим показать текущее значение из status_var с правильным цветом
-            try:
-                val = int(self.status_var.get())
-                color = STATUS_COLORS.get(val, "#000")
-            except ValueError:
-                color = "#000"
-            self.status_preview.config(text="(ручной)", fg=color)
-
-    def _on_manual_override_changed(self):
-        """Обработчик изменения полного ручного режима"""
-        if self.status_manual_override_var.get():
-            # Полный ручной режим - игнорируем зависимости
-            self.status_auto_var.set(False)  # Отключаем авто режим
-            self.status_combo.config(state="readonly")
-            self.status_preview.config(text="(полностью ручной)", fg="#9e9e9e")
-        else:
-            # Возвращаемся к обычному режиму (авто или обычный ручной)
-            if self.status_auto_var.get():
-                self.status_combo.config(state="disabled")
-                if self.selected_element_id:
-                    info = self.manager.get_element_info(self.selected_element_id)
-                    if info:
-                        self.status_preview.config(
-                            text=f"→ Авто: {info['status']}",
-                            fg=STATUS_COLORS.get(info["status"], "#000"),
-                        )
+    def _on_status_changed(self, event=None):
+        """Обработчик изменения статуса в combobox (ручной режим)."""
+        if not self.selected_element_id:
+            return
+        try:
+            val = int(self.status_var.get())
+            val = max(-3, min(3, val))  # Ограничиваем диапазон -3..+3
+            # Обновляем предпросмотр
+            color = STATUS_COLORS.get(val, "#000")
+            
+            # Проверяем, есть ли зависимости у элемента
+            elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
+            has_dependencies = len(elem.depends_on) > 0
+            
+            if has_dependencies:
+                # Есть зависимости - полное переопределение (**)
+                self.status_preview.config(text=f"(ручной: {val}) **", fg=color)
+                self.save_btn.config(text="💾 Сохранить изменения**")
             else:
-                self.status_combo.config(state="readonly")
+                # Нет зависимостей - редактирование (*)
+                self.status_preview.config(text=f"(ручной: {val})", fg=color)
+                self.save_btn.config(text="💾 Сохранить изменения*")
+        except ValueError:
+            self.status_preview.config(text="(неверное значение)", fg="#f44336")
 
     def bind_events(self):
         self.lists_lb.bind("<<ListboxSelect>>", self.on_list_select)
@@ -1027,10 +995,9 @@ class ListManagerApp(tk.Tk):
     def clear_details(self):
         self.name_var.set("")
         self.desc_text.delete("1.0", tk.END)
-        self.status_auto_var.set(True)
         self.status_var.set("0")
-        self.status_combo.config(state="disabled")
-        self.status_preview.config(text="→ Авто: 0", fg="#616161")
+        self.status_preview.config(text="", fg="#616161")
+        self.save_btn.config(text="💾 Сохранить изменения")
         self.refs_lb.delete(0, tk.END)
         self.deps_lb.delete(0, tk.END)
         self.rev_deps_lb.delete(0, tk.END)
@@ -1050,52 +1017,33 @@ class ListManagerApp(tk.Tk):
         self.desc_text.insert("1.0", info.get("description", ""))
 
         cs = info.get("custom_status")
-        status_range = info.get("status_range", [])
         
-        # Проверяем, есть ли полный ручной режим в metadata
-        manual_override = info.get("metadata", {}).get("manual_override", False)
-        self.status_manual_override_var.set(manual_override)
+        # Проверяем, есть ли зависимости у элемента
+        elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
+        has_dependencies = len(elem.depends_on) > 0
         
-        # Обновляем значения в комбобоксе статуса на основе допустимого диапазона
-        if manual_override or status_range:
-            # В полном ручном режиме показываем все варианты
-            if manual_override:
-                self.status_combo.config(values=["-"] + [str(i) for i in range(-3, 4)])
-            elif status_range:
-                self.status_combo.config(values=[str(i) for i in status_range])
-            else:
-                self.status_combo.config(values=[])
+        # Устанавливаем значение статуса
+        if cs is not None:
+            self.status_var.set(str(cs))
         else:
-            self.status_combo.config(values=[])
-        
-        if cs is None and not manual_override:
-            # Авто режим
-            self.status_auto_var.set(True)
             self.status_var.set(str(info["status"]))
-            self.status_combo.config(state="disabled")
-            range_text = f"→ Авто: {info['status']} (доступно: {info.get('status_low', -3)}…{info.get('status_high', 3)})"
-            self.status_preview.config(
-                text=range_text,
-                fg=STATUS_COLORS.get(info["status"], "#000"),
-            )
+        
+        # Обновляем индикатор статуса
+        if cs is not None:
+            color = STATUS_COLORS.get(cs, "#000")
+            if has_dependencies:
+                # Есть зависимости - полное переопределение (**)
+                self.status_preview.config(text=f"(ручной: {cs}) **", fg=color)
+                self.save_btn.config(text="💾 Сохранить изменения**")
+            else:
+                # Нет зависимостей - редактирование (*)
+                self.status_preview.config(text=f"(ручной: {cs})", fg=color)
+                self.save_btn.config(text="💾 Сохранить изменения*")
         else:
-            # Ручной режим
-            self.status_auto_var.set(False)
-            if manual_override:
-                # Полный ручной - игнорируем диапазон
-                self.status_combo.config(state="readonly")
-                self.status_preview.config(text="(полностью ручной)", fg="#9e9e9e")
-            else:
-                # Обычный ручной с диапазоном
-                self.status_combo.config(state="readonly")
-                range_text = f"(ручной, доступно: {info.get('status_low', -3)}…{info.get('status_high', 3)})"
-                self.status_preview.config(text=range_text, fg=STATUS_COLORS.get(cs if cs is not None else 0, "#000"))
-            
-            # Устанавливаем значение статуса
-            if cs is not None:
-                self.status_var.set(str(cs))
-            else:
-                self.status_var.set("-")
+            # Автоматический режим
+            color = STATUS_COLORS.get(info["status"], "#000")
+            self.status_preview.config(text=f"→ Авто: {info['status']}", fg=color)
+            self.save_btn.config(text="💾 Сохранить изменения")
 
         # Ссылки
         self.refs_lb.delete(0, tk.END)
@@ -1230,24 +1178,14 @@ class ListManagerApp(tk.Tk):
         elem.name = self.name_var.get().strip()
         elem.description = self.desc_text.get("1.0", tk.END).strip()
 
-        # Сохраняем флаг полного ручного режима в metadata
-        elem.metadata["manual_override"] = self.status_manual_override_var.get()
-
-        if self.status_auto_var.get() and not self.status_manual_override_var.get():
-            # Авто режим - сбрасываем custom_status
+        # Сохраняем статус
+        status_val = self.status_var.get()
+        try:
+            val = int(status_val)
+            elem.custom_status = max(-3, min(3, val))
+        except ValueError:
+            # Неверное значение - сбрасываем
             elem.custom_status = None
-        else:
-            # Ручной режим (обычный или полный)
-            status_val = self.status_var.get()
-            if status_val == "-":
-                # Статус "-" означает отсутствие позиции
-                elem.custom_status = None  # None будет интерпретироваться как "-"
-            else:
-                try:
-                    val = int(status_val)
-                    elem.custom_status = max(-3, min(3, val))
-                except ValueError:
-                    elem.custom_status = None
 
         self.manager._recalculate_states()
         self.refresh_tree()
@@ -1308,6 +1246,8 @@ class ListManagerApp(tk.Tk):
         self.manager._recalculate_states()
         self.refresh_tree()
         self.load_element_details()
+        # Обновляем индикатор редактирования после добавления зависимости
+        self._on_status_changed()
 
     def remove_dependency(self):
         sel = self.deps_lb.curselection()
