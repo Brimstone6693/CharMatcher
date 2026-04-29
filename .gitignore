@@ -9,31 +9,18 @@ __pycache__/
 .venv/
 venv/
 env/
-.env
-.env.local
-.env.*
+ENV/
 
 # Build artifacts
 dist/
 build/
 *.egg-info/
 
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
 # Logs
 *.log
 
-# Coverage
-.coverage
-coverage/
-htmlcov/
-
-# Temp files
-*.tmp
-.DS_Store
-Thumbs.db
+# Environment
+.env
+.env.local
+.env.*
 ```
