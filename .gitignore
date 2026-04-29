@@ -1,1 +1,1 @@
-Nothing needs to be added to the .gitignore file based on the provided changes. The modification of 'modules/Tag_Hierarch/gui/main_app.py' does not require any new ignore rules, as it appears to be a standard Python source file. The current .gitignore content is preserved as is.
+Nothing should be ignored based on the provided file changes. The only modified file is a Python source file (`modules/Tag_Hierarch/gui/main_app.py`), which should not be added to .gitignore.
