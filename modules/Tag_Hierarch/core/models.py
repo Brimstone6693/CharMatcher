@@ -8,6 +8,8 @@ import uuid
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
+from modules.Tag_Hierarch.core.status_calculator import StatusCalculator
+
 
 @dataclass
 class Element:
