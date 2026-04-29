@@ -287,6 +287,9 @@ class ListManager:
         self._recalculate_states()
 
     def _recalculate_states(self):
+        """Пересчитывает статусы всех элементов с использованием системы весов."""
+        from modules.Tag_Hierarch.core.config import BASE_WEIGHTS
+        
         visited, temp_mark, order = set(), set(), []
 
         def visit(eid):
@@ -313,41 +316,118 @@ class ListManager:
             if not lid:
                 continue
             elem = self.lists[lid].elements[eid]
+            
+            # Полный ручной режим - игнорируем зависимости
+            if elem.metadata.get("manual_override", False):
+                if elem.custom_status is not None:
+                    elem.status = max(-3, min(3, elem.custom_status))
+                continue
+            
+            # Если установлен ручной статус (но не полный ручной режим)
             if elem.custom_status is not None:
                 elem.status = max(-3, min(3, elem.custom_status))
                 continue
 
-            low, high = -3, 3
+            # Собираем ограничения от зависимостей
+            constraints = []
+            
+            # Ограничение от родителя
             if elem.parent_id:
                 parent_lid = self._global_elements.get(elem.parent_id)
                 if parent_lid and elem.parent_id in self.lists[parent_lid].elements:
-                    high = min(high, self.lists[parent_lid].elements[elem.parent_id].status)
+                    parent_status = self.lists[parent_lid].elements[elem.parent_id].status
+                    constraints.append({
+                        "range": (-3, parent_status),
+                        "force": abs(BASE_WEIGHTS[parent_status])
+                    })
 
+            # Ограничения от зависимостей
             for dep_id, dep_type in elem.depends_on.items():
                 dep_lid = self._global_elements.get(dep_id)
                 if not dep_lid or dep_id not in self.lists[dep_lid].elements:
                     continue
                 s = self.lists[dep_lid].elements[dep_id].status
+                
                 if dep_type == "EQ":
-                    low = max(low, s)
-                    high = min(high, s)
+                    # Диапазон: {s}, Сила: |BASE_WEIGHTS[s]|
+                    constraints.append({
+                        "range": (s, s),
+                        "force": abs(BASE_WEIGHTS[s])
+                    })
                 elif dep_type == "PM1":
-                    low = max(low, s - 1)
-                    high = min(high, s + 1)
+                    # Диапазон: [s-1, s+1], Сила: 4 если s=±3, иначе |BASE_WEIGHTS[s]|
+                    low = max(-3, s - 1)
+                    high = min(3, s + 1)
+                    force = 4 if abs(s) == 3 else abs(BASE_WEIGHTS[s])
+                    constraints.append({
+                        "range": (low, high),
+                        "force": force
+                    })
                 elif dep_type == "LE":
-                    high = min(high, s)
+                    # Диапазон: [-3, s], Сила: среднее |BASE_WEIGHTS| от -3 до s
+                    weights_in_range = [abs(BASE_WEIGHTS[i]) for i in range(-3, s + 1)]
+                    force = sum(weights_in_range) / len(weights_in_range) if weights_in_range else 0
+                    constraints.append({
+                        "range": (-3, s),
+                        "force": force
+                    })
                 elif dep_type == "GE":
-                    low = max(low, s)
+                    # Диапазон: [s, 3], Сила: среднее |BASE_WEIGHTS| от s до 3
+                    weights_in_range = [abs(BASE_WEIGHTS[i]) for i in range(s, 4)]
+                    force = sum(weights_in_range) / len(weights_in_range) if weights_in_range else 0
+                    constraints.append({
+                        "range": (s, 3),
+                        "force": force
+                    })
+                elif dep_type == "WLE":
+                    # Слабое LE: диапазон [-3, s+1] (сдвиг +1), сила уменьшена вдвое
+                    adjusted_s = min(3, s + 1)
+                    weights_in_range = [abs(BASE_WEIGHTS[i]) for i in range(-3, adjusted_s + 1)]
+                    force = (sum(weights_in_range) / len(weights_in_range) if weights_in_range else 0) * 0.5
+                    constraints.append({
+                        "range": (-3, adjusted_s),
+                        "force": force
+                    })
+                elif dep_type == "WGE":
+                    # Слабое GE: диапазон [s-1, 3] (сдвиг -1), сила уменьшена вдвое
+                    adjusted_s = max(-3, s - 1)
+                    weights_in_range = [abs(BASE_WEIGHTS[i]) for i in range(adjusted_s, 4)]
+                    force = (sum(weights_in_range) / len(weights_in_range) if weights_in_range else 0) * 0.5
+                    constraints.append({
+                        "range": (adjusted_s, 3),
+                        "force": force
+                    })
 
-            if low > high:
-                elem.status = -3
+            # Если нет ограничений, статус 0
+            if not constraints:
+                elem.status = 0
+                continue
+
+            # Расчёт Score для каждого статуса
+            scores = {}
+            for status in range(-3, 4):
+                score = 0.0
+                for constraint in constraints:
+                    low, high = constraint["range"]
+                    if low <= status <= high:
+                        score += constraint["force"]
+                scores[status] = score
+
+            # Выбор статуса с максимальным Score
+            max_score = max(scores.values())
+            candidates = [s for s, sc in scores.items() if sc == max_score]
+            
+            if len(candidates) == 1:
+                elem.status = candidates[0]
             else:
-                if low <= 0 <= high:
-                    elem.status = 0
-                elif high < 0:
-                    elem.status = high
-                else:
-                    elem.status = low
+                # Tie-breaking: предпочтение статусу с большим |BASE_WEIGHTS|
+                candidates.sort(key=lambda s: (-abs(BASE_WEIGHTS[s]), -s))
+                elem.status = candidates[0]
+
+            # Если суммарная сила всех ограничений равна нулю
+            total_force = sum(c["force"] for c in constraints)
+            if total_force == 0:
+                elem.status = 0
 
     def get_element_info(self, element_id: str) -> Optional[dict]:
         lid = self._global_elements.get(element_id)

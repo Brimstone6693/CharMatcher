@@ -11,6 +11,20 @@ venv/
 env/
 ENV/
 
+<<<<<<< HEAD
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.*
+=======
 # Logs
 *.log
 
@@ -43,4 +57,5 @@ coverage/
 # Testing
 .pytest_cache/
 .mypy_cache/
+>>>>>>> TagHierarch
 ```
