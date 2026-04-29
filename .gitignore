@@ -1,4 +1,4 @@
-```
+```gitignore
 # Python
 __pycache__/
 *.pyc
@@ -9,53 +9,20 @@ __pycache__/
 .venv/
 venv/
 env/
-ENV/
-
-<<<<<<< HEAD
-# Build artifacts
-dist/
-build/
-*.egg-info/
-
-# Logs
-*.log
-
-# Environment
 .env
 .env.local
 .env.*
-=======
-# Logs
+
+# Logs and temporary files
 *.log
-
-# Environment variables
-.env
-.env.local
-*.env
-
-# Editor/IDE
-.vscode/
-.idea/
-*.swp
-*.swo
 *.tmp
 
-# Build artifacts
-dist/
+# Editors
+.vscode/
+.idea/
+
+# Build and distribution
 build/
-*.so
-*.dylib
-*.dll
-*.exe
-*.out
-
-# Coverage
-.coverage
-htmlcov/
-coverage/
-
-# Testing
-.pytest_cache/
-.mypy_cache/
->>>>>>> TagHierarch
+dist/
+*.egg-info/
 ```

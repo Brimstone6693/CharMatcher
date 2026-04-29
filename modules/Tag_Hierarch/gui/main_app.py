@@ -27,6 +27,8 @@ class ListManagerApp(tk.Tk):
         self.links_map: Dict[int, str] = {}
         self.deps_map: Dict[int, str] = {}
         self.rev_deps_map: Dict[int, str] = {}
+        # Отслеживание состояния изменений: None, "edited" (*), "overridden" (**)
+        self.element_edit_state: Optional[str] = None
 
         self.create_menu()
         self.create_ui()
@@ -152,25 +154,17 @@ class ListManagerApp(tk.Tk):
         status_frame = tk.LabelFrame(right_frame, text="Статус (-3 … +3)")
         status_frame.pack(fill="x", padx=5, pady=5)
 
-        self.status_auto_var = tk.BooleanVar(value=True)
         self.status_var = tk.StringVar(value="0")
-
-        auto_cb = tk.Checkbutton(
-            status_frame, text="Авто (наследуется от зависимостей)",
-            variable=self.status_auto_var,
-            command=self._on_auto_changed,
-        )
-        auto_cb.pack(anchor="w", padx=5, pady=(5, 0))
 
         manual_frame = tk.Frame(status_frame)
         manual_frame.pack(fill="x", padx=5, pady=5)
 
-        tk.Label(manual_frame, text="Ручной:").pack(side="left")
+        tk.Label(manual_frame, text="Значение:").pack(side="left")
         self.status_combo = ttk.Combobox(
             manual_frame,
             textvariable=self.status_var,
             values=[str(i) for i in range(-3, 4)],
-            state="disabled",
+            state="readonly",
             width=5,
         )
         self.status_combo.pack(side="left", padx=5)
@@ -241,43 +235,9 @@ class ListManagerApp(tk.Tk):
             self.status_preview.config(text=f"(ручной: {val})", fg=color)
             # Визуально подсветим кнопку сохранения, чтобы показать, что есть несохранённые изменения
             self.save_btn.config(bg="#bbdefb", text="💾 Сохранить изменения*")
+            self.element_edit_state = "edited"
         except ValueError:
             self.status_preview.config(text="(ручной)", fg="#000")
-        # Помечаем как изменённое
-        self._on_field_changed()
-
-    def _on_auto_changed(self):
-        if not self.selected_element_id or not self.current_list_id:
-            return
-        # Подсветим кнопку сохранения, так как режим изменился
-        self.save_btn.config(bg="#bbdefb", text="💾 Сохранить изменения*")
-        if self.status_auto_var.get():
-            self.status_combo.config(state="disabled")
-            # Показать текущий рассчитанный статус
-            info = self.manager.get_element_info(self.selected_element_id)
-            if info:
-                self.status_var.set(str(info['status']))
-                self.status_preview.config(
-                    text=f"→ Авто: {info['status']}",
-                    fg=STATUS_COLORS.get(info["status"], "#000"),
-                )
-        else:
-            self.status_combo.config(state="readonly")
-            # При переключении в ручной режим инициализировать status_var текущим статусом
-            info = self.manager.get_element_info(self.selected_element_id)
-            if info:
-                cs = info.get('custom_status')
-                if cs is not None:
-                    # Элемент уже имел кастомный статус - восстанавливаем его
-                    self.status_var.set(str(cs))
-                    self.status_preview.config(text=f"(ручной: {cs})", fg=STATUS_COLORS.get(cs, "#000"))
-                else:
-                    # Кастомного статуса не было - используем текущий авто-статус как начальное значение
-                    self.status_var.set(str(info['status']))
-                    # Сразу записываем это значение как custom_status, чтобы оно сохранилось при нажатии кнопки
-                    elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
-                    elem.custom_status = info['status']
-                    self.status_preview.config(text=f"(ручной: {info['status']})", fg=STATUS_COLORS.get(info['status'], "#000"))
         # Помечаем как изменённое
         self._on_field_changed()
 
@@ -285,6 +245,40 @@ class ListManagerApp(tk.Tk):
         """Вызывается при изменении любого поля элемента - подсвечивает кнопку сохранения."""
         if self.selected_element_id and self.current_list_id:
             self.save_btn.config(bg="#bbdefb", text="💾 Сохранить изменения*")
+
+    def update_edit_indicator(self):
+        """Обновляет индикатор редактирования (* или **) на основе состояния элемента."""
+        if not self.selected_element_id or not self.current_list_id:
+            return
+        elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
+        
+        # Проверяем, установлен ли custom_status
+        has_custom_status = elem.custom_status is not None
+        
+        # Проверяем, есть ли зависимости у элемента
+        has_dependencies = len(elem.depends_on) > 0
+        
+        if has_custom_status:
+            if has_dependencies:
+                # Есть и ручной статус и зависимости - полное переопределение (**)
+                self.element_edit_state = "overridden"
+                self.save_btn.config(text="💾 Сохранить изменения**")
+                self.status_preview.config(text=f"(ручной: {elem.custom_status}) **", 
+                                           fg=STATUS_COLORS.get(elem.custom_status, "#000"))
+            else:
+                # Только ручной статус без зависимостей - редактирование (*)
+                self.element_edit_state = "edited"
+                self.save_btn.config(text="💾 Сохранить изменения*")
+                self.status_preview.config(text=f"(ручной: {elem.custom_status})", 
+                                           fg=STATUS_COLORS.get(elem.custom_status, "#000"))
+        else:
+            # Автоматический режим
+            self.element_edit_state = None
+            self.save_btn.config(text="💾 Сохранить изменения")
+            info = self.manager.get_element_info(self.selected_element_id)
+            if info:
+                self.status_preview.config(text=f"→ Авто: {info['status']}", 
+                                           fg=STATUS_COLORS.get(info['status'], "#000"))
 
     def bind_events(self):
         self.lists_lb.bind("<<ListboxSelect>>", self.on_list_select)
@@ -359,9 +353,8 @@ class ListManagerApp(tk.Tk):
     def clear_details(self):
         self.name_var.set("")
         self.desc_text.delete("1.0", tk.END)
-        self.status_auto_var.set(True)
         self.status_var.set("0")
-        self.status_combo.config(state="disabled")
+        self.status_combo.config(state="readonly")
         self.status_preview.config(text="→ Авто: 0", fg="#616161")
         self.refs_lb.delete(0, tk.END)
         self.deps_lb.delete(0, tk.END)
@@ -369,6 +362,7 @@ class ListManagerApp(tk.Tk):
         self.links_map.clear()
         self.deps_map.clear()
         self.rev_deps_map.clear()
+        self.element_edit_state = None
 
     def load_element_details(self):
         if not self.selected_element_id:
@@ -382,20 +376,24 @@ class ListManagerApp(tk.Tk):
         self.desc_text.insert("1.0", info.get("description", ""))
 
         cs = info.get("custom_status")
+        # Всегда включаем ручной режим с combobox
+        self.status_combo.config(state="readonly")
         if cs is None:
-            self.status_auto_var.set(True)
+            # Нет ручного статуса - показываем авто-статус
             self.status_var.set(str(info["status"]))
-            self.status_combo.config(state="disabled")
             self.status_preview.config(
                 text=f"→ Авто: {info['status']}",
                 fg=STATUS_COLORS.get(info["status"], "#000"),
             )
         else:
-            self.status_auto_var.set(False)
+            # Есть ручной статус
             self.status_var.set(str(cs))
-            self.status_combo.config(state="readonly")
-            # Обновление превью с фактическим значением статуса
-            self.status_preview.config(text=f"(ручной: {cs})", fg=STATUS_COLORS.get(cs, "#000"))
+            # Обновление превью с фактическим значением статуса и индикатором
+            has_dependencies = len(info.get("resolved_dependencies", [])) > 0
+            if has_dependencies:
+                self.status_preview.config(text=f"(ручной: {cs}) **", fg=STATUS_COLORS.get(cs, "#000"))
+            else:
+                self.status_preview.config(text=f"(ручной: {cs})", fg=STATUS_COLORS.get(cs, "#000"))
 
         # Ссылки
         self.refs_lb.delete(0, tk.END)
@@ -538,16 +536,19 @@ class ListManagerApp(tk.Tk):
         elem.name = self.name_var.get().strip()
         elem.description = self.desc_text.get("1.0", tk.END).strip()
 
-        # Обработка статуса: если "Авто" включено - custom_status = None, иначе сохраняем выбранное значение
-        if self.status_auto_var.get():
-            elem.custom_status = None
-        else:
-            # В ручном режиме сохраняем значение из combobox как custom_status
-            try:
-                val = int(self.status_var.get())
+        # В ручном режиме сохраняем значение из combobox как custom_status
+        # Если пользователь не менял статус (combobox показывает авто-значение), custom_status остаётся None
+        try:
+            val = int(self.status_var.get())
+            # Проверяем, отличается ли выбранное значение от авто-статуса
+            current_auto_status = elem.status
+            if val != current_auto_status:
                 elem.custom_status = max(-3, min(3, val))
-            except ValueError:
+            else:
+                # Если значение совпадает с авто-статусом, снимаем ручной статус
                 elem.custom_status = None
+        except ValueError:
+            elem.custom_status = None
 
         self.manager._recalculate_states()
         self.refresh_tree()
@@ -611,6 +612,8 @@ class ListManagerApp(tk.Tk):
         self.manager._recalculate_states()
         self.refresh_tree()
         self.load_element_details()
+        # Обновляем индикатор редактирования после добавления зависимости
+        self.update_edit_indicator()
 
     def remove_dependency(self):
         sel = self.deps_lb.curselection()
@@ -625,6 +628,8 @@ class ListManagerApp(tk.Tk):
         self.manager._recalculate_states()
         self.refresh_tree()
         self.load_element_details()
+        # Обновляем индикатор редактирования после удаления зависимости
+        self.update_edit_indicator()
 
     def save_file(self):
         import os
