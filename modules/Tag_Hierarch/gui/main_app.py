@@ -157,22 +157,16 @@ class ListManagerApp(tk.Tk):
         self.status_var = tk.StringVar(value="0")
         self.manual_override_var = tk.BooleanVar(value=False)
 
-        # Чекбокс "Ручная настройка" (полное переопределение)
-        self.manual_override_cb = tk.Checkbutton(
-            status_frame,
-            text="🔓 Ручная настройка (игнорировать зависимости)",
-            variable=self.manual_override_var,
-            command=self._on_manual_override_changed,
-            anchor="w",
-        )
-        self.manual_override_cb.pack(fill="x", padx=5, pady=(5, 0))
+        # Фрейм для статуса с чекбоксом справа
+        status_top_frame = tk.Frame(status_frame)
+        status_top_frame.pack(fill="x", padx=5, pady=5)
 
-        manual_frame = tk.Frame(status_frame)
-        manual_frame.pack(fill="x", padx=5, pady=5)
+        left_frame = tk.Frame(status_top_frame)
+        left_frame.pack(side="left")
 
-        tk.Label(manual_frame, text="Значение:").pack(side="left")
+        tk.Label(left_frame, text="Значение:").pack(side="left")
         self.status_combo = ttk.Combobox(
-            manual_frame,
+            left_frame,
             textvariable=self.status_var,
             values=[str(i) for i in range(-3, 4)],
             state="readonly",  # Только выбор из списка
@@ -181,8 +175,18 @@ class ListManagerApp(tk.Tk):
         self.status_combo.pack(side="left", padx=5)
         self.status_combo.bind("<<ComboboxSelected>>", self._on_status_changed)
 
-        self.status_preview = tk.Label(manual_frame, text="→ Авто: 0", font=("Segoe UI", 9, "italic"))
-        self.status_preview.pack(side="left", padx=5)
+        self.status_preview = tk.Label(left_frame, text="→ Авто: 0", font=("Segoe UI", 9, "italic"))
+        self.status_preview.pack(side="left", padx=10)
+
+        # Чекбокс "Ручная настройка" справа
+        self.manual_override_cb = tk.Checkbutton(
+            status_top_frame,
+            text="🔓 Ручная настройка (игнорировать зависимости)",
+            variable=self.manual_override_var,
+            command=self._on_manual_override_changed,
+            anchor="w",
+        )
+        self.manual_override_cb.pack(side="right", padx=5)
 
         # Сохранить (сразу после блока Статус)
         self.save_btn = tk.Button(
