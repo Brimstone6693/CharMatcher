@@ -164,11 +164,12 @@ class ListManagerApp(tk.Tk):
             manual_frame,
             textvariable=self.status_var,
             values=[str(i) for i in range(-3, 4)],
-            state="readonly",
+            state="normal",  # Разрешён ручной ввод
             width=5,
         )
         self.status_combo.pack(side="left", padx=5)
         self.status_combo.bind("<<ComboboxSelected>>", self._on_status_changed)
+        self.status_combo.bind("<KeyRelease>", self._on_status_key_release)
 
         self.status_preview = tk.Label(manual_frame, text="→ Авто: 0", font=("Segoe UI", 9, "italic"))
         self.status_preview.pack(side="left", padx=5)
@@ -220,6 +221,26 @@ class ListManagerApp(tk.Tk):
         self.rev_deps_lb.pack(fill="both", expand=True, padx=2, pady=2)
         rev_deps_scroll.config(command=self.rev_deps_lb.yview)
 
+    def _on_status_key_release(self, event=None):
+        """Обработчик ручного ввода статуса через клавиатуру."""
+        if not self.selected_element_id or not self.current_list_id:
+            return
+        try:
+            val = int(self.status_var.get())
+            # Проверяем диапазон
+            if -3 <= val <= 3:
+                elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
+                elem.custom_status = max(-3, min(3, val))
+                self.manager._recalculate_states()
+                self.refresh_tree()
+                color = STATUS_COLORS.get(val, "#000")
+                self.update_edit_indicator()
+            else:
+                self.status_preview.config(text="(вне диапазона)", fg="#f44336")
+        except ValueError:
+            self.status_preview.config(text="(неверное значение)", fg="#f44336")
+        self._on_field_changed()
+
     def _on_status_changed(self, event=None):
         """Обработчик изменения статуса в combobox (ручной режим)."""
         if not self.selected_element_id or not self.current_list_id:
@@ -232,10 +253,7 @@ class ListManagerApp(tk.Tk):
             self.manager._recalculate_states()
             self.refresh_tree()
             color = STATUS_COLORS.get(val, "#000")
-            self.status_preview.config(text=f"(ручной: {val})", fg=color)
-            # Визуально подсветим кнопку сохранения, чтобы показать, что есть несохранённые изменения
-            self.save_btn.config(bg="#bbdefb", text="💾 Сохранить изменения*")
-            self.element_edit_state = "edited"
+            self.update_edit_indicator()
         except ValueError:
             self.status_preview.config(text="(ручной)", fg="#000")
         # Помечаем как изменённое
@@ -354,7 +372,7 @@ class ListManagerApp(tk.Tk):
         self.name_var.set("")
         self.desc_text.delete("1.0", tk.END)
         self.status_var.set("0")
-        self.status_combo.config(state="readonly")
+        self.status_combo.config(state="normal")  # Разрешён ручной ввод
         self.status_preview.config(text="→ Авто: 0", fg="#616161")
         self.refs_lb.delete(0, tk.END)
         self.deps_lb.delete(0, tk.END)
@@ -377,7 +395,7 @@ class ListManagerApp(tk.Tk):
 
         cs = info.get("custom_status")
         # Всегда включаем ручной режим с combobox
-        self.status_combo.config(state="readonly")
+        self.status_combo.config(state="normal")  # Разрешён ручной ввод
         if cs is None:
             # Нет ручного статуса - показываем авто-статус
             self.status_var.set(str(info["status"]))

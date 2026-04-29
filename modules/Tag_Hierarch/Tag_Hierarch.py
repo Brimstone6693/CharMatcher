@@ -3,7 +3,7 @@
 """
 Менеджер связанных списков — расширенная версия:
   • 7 уровней статуса (-3 … +3)
-  • Типы зависимостей: EQ, PM1, LE, GE с цветовой маркировкой
+  • Типы зависимостей: EQ, PM1, LE, GE, WLE, WGE с цветовой маркировкой
   • Обратные зависимости (depended_by)
   • Ссылки всегда двусторонние
 """
@@ -15,44 +15,8 @@ import uuid
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
-
-DEP_TYPES = {
-    "EQ": "Строго равно",
-    "PM1": "± 1",
-    "LE": "Не больше (≤)",
-    "GE": "Не меньше (≥)",
-}
-
-DEP_COLORS = {
-    "EQ": "#9c27b0",
-    "PM1": "#2196f3",
-    "LE": "#f44336",
-    "GE": "#4caf50",
-}
-
-STATUS_COLORS = {
-    -3: "#8b0000",
-    -2: "#d32f2f",
-    -1: "#f57c00",
-    0: "#616161",
-    1: "#7cb342",
-    2: "#388e3c",
-    3: "#1b5e20",
-    None: "#9e9e9e",  # Для статуса "-" (отсутствие позиции)
-}
-
-# Базовые веса статусов: -5 -3 -1 0 1 3 5
-# Отражает "силу мнения": чем больше модуль, тем увереннее позиция
-BASE_WEIGHTS = {
-    -3: -5,  # Категорически против
-    -2: -3,  # Сильно не нравится
-    -1: -1,  # Не очень
-    0: 0,    # Нейтрально
-    1: 1,    # Нравится
-    2: 3,    # Обожаю
-    3: 5,    # Абсолютно без ума
-    None: 0, # Отсутствие позиции (не влияет)
-}
+# Импортируем актуальные конфигурации из core.config
+from modules.Tag_Hierarch.core.config import DEP_TYPES, DEP_COLORS, STATUS_COLORS, BASE_WEIGHTS
 
 def get_status_weight(status: Optional[int]) -> int:
     """Возвращает базовый вес статуса (может быть отрицательным)."""
@@ -426,6 +390,30 @@ class ListManager:
                             'high': s,
                             'strength': strength
                         })
+                    
+                elif dep_type == "WLE":
+                    # Слабое LE: диапазон [-3, s+1], сила уменьшена вдвое
+                    if s is not None:
+                        high_bound = min(3, s + 1)
+                        statuses_range = list(range(-3, high_bound + 1))
+                        strength = calculate_constraint_strength(statuses_range) / 2
+                        constraints.append({
+                            'low': -3,
+                            'high': high_bound,
+                            'strength': strength
+                        })
+                    
+                elif dep_type == "WGE":
+                    # Слабое GE: диапазон [s-1, 3], сила уменьшена вдвое
+                    if s is not None:
+                        low_bound = max(-3, s - 1)
+                        statuses_range = list(range(low_bound, 4))
+                        strength = calculate_constraint_strength(statuses_range) / 2
+                        constraints.append({
+                            'low': low_bound,
+                            'high': 3,
+                            'strength': strength
+                        })
             
             # Агрегация: расчёт Score для каждого статуса
             if not constraints:
@@ -497,6 +485,12 @@ class ListManager:
                 high = min(high, s)
             elif dep_type == "GE":
                 low = max(low, s)
+            elif dep_type == "WLE":
+                # Слабое LE: сдвиг +1
+                high = min(high, s + 1)
+            elif dep_type == "WGE":
+                # Слабое GE: сдвиг -1
+                low = max(low, s - 1)
 
         info["status_low"] = low
         info["status_high"] = high
