@@ -17,7 +17,7 @@ class SelectElementDialog(tk.Toplevel):
         self.exclude_id = exclude_id
         self.result = None
         self.title(title)
-        self.geometry("500x400")
+        self.geometry("600x450")
         self.transient(parent)
         self.protocol("WM_DELETE_WINDOW", self.on_cancel)
 
@@ -88,7 +88,7 @@ class SelectDepTypeDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Тип зависимости")
-        self.geometry("320x220")
+        self.geometry("400x280")
         self.transient(parent)
         self.result = None
         self.protocol("WM_DELETE_WINDOW", self.on_cancel)
@@ -105,7 +105,7 @@ class SelectDepTypeDialog(tk.Toplevel):
                 fg=color, font=("Segoe UI", 9, "bold"),
                 command=lambda c=code: self.select(c),
             )
-            btn.pack(fill="x", padx=20, pady=3)
+            btn.pack(fill="x", padx=30, pady=2)
 
         tk.Button(self, text="Отмена", command=self.on_cancel).pack(pady=10)
         self.center_on_parent()
