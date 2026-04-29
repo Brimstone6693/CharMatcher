@@ -1,1 +1,18 @@
-Nothing should be ignored based on the provided file changes. The only modified file is a Python source file (`modules/Tag_Hierarch/gui/main_app.py`), which should not be added to .gitignore.
+```gitignore
+# Python compiled files
+*.pyc
+__pycache__/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+```
