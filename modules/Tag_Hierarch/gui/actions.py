@@ -106,7 +106,7 @@ class ActionHandler:
         elem = self.app.manager.lists[self.app.current_list_id].elements[self.app.selected_element_id]
         
         elem.name = self.app.name_var.get().strip()
-        elem.description = self.app.desc_text.get("1.0", tk.END).strip()
+        elem.description = self.app.desc_text.get("1.0", "end").strip()
         
         try:
             val = int(self.app.status_var.get())
