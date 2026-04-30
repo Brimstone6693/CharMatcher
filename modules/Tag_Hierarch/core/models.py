@@ -321,6 +321,8 @@ class ListManager:
             if elem.metadata.get("manual_override", False):
                 if elem.custom_status is not None:
                     elem.status = max(-3, min(3, elem.custom_status))
+                else:
+                    elem.status = 0
                 continue
             
             # Если установлен ручной статус (но не полный ручной режим)
