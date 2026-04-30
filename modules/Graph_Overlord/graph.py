@@ -29,8 +29,30 @@ class InterestGraph:
         self._children_map: dict[str, list[str]] = defaultdict(list)  # parent_id -> [child_ids]
         self._association_edges: dict[str, list[Edge]] = defaultdict(list)  # node_id -> [edges]
     
-    def add_node(self, node: InterestNode) -> None:
-        """Add a node to the graph."""
+    def add_node(self, node_id: str, name: str, is_category: bool = False, **kwargs) -> InterestNode:
+        """Add a node to the graph. Returns the created node."""
+        # Check if node already exists
+        if node_id in self.nodes:
+            return self.nodes[node_id]
+        
+        # Create node with provided parameters
+        node = InterestNode(
+            id=node_id,
+            name=name,
+            is_category=is_category,
+            att=kwargs.get('att', 0.0),
+            int=kwargs.get('int', 0.0),
+            user_att=kwargs.get('user_att'),
+            user_int=kwargs.get('user_int'),
+            user_weight_override=kwargs.get('user_weight_override'),
+            locked=kwargs.get('locked', False),
+            active=kwargs.get('active', True),
+        )
+        self.nodes[node_id] = node
+        return node
+    
+    def add_node_object(self, node: InterestNode) -> None:
+        """Add an existing InterestNode object to the graph."""
         self.nodes[node.id] = node
     
     def remove_node(self, node_id: str) -> None:
@@ -199,7 +221,7 @@ class InterestGraph:
         
         for node_data in data.get('nodes', []):
             node = InterestNode.from_dict(node_data)
-            graph.add_node(node)
+            graph.add_node_object(node)
         
         for edge_data in data.get('edges', []):
             edge = Edge.from_dict(edge_data)
