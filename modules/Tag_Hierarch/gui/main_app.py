@@ -30,9 +30,6 @@ class ListManagerApp(tk.Tk):
         self.manager = ListManager()
         self.current_list_id: Optional[str] = None
         self.selected_element_id: Optional[str] = None
-        self.links_map: Dict[int, str] = {}
-        self.deps_map: Dict[int, str] = {}
-        self.rev_deps_map: Dict[int, str] = {}
         self.element_edit_state: Optional[str] = None
         
         # Флаги для предотвращения рекурсивных вызовов событий
