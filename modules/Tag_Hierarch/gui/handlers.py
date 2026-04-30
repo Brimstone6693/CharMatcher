@@ -202,34 +202,26 @@ class DetailsLoader:
         self._load_reverse_dependencies(info)
     
     def _load_references(self, info):
-        self.app.refs_lb.delete(0, tk.END)
-        self.app.links_map.clear()
-        for i, ref in enumerate(info.get("resolved_references", [])):
+        self.app.refs_panel.clear()
+        for ref in info.get("resolved_references", []):
             display = f"{ref['name']} ({ref['list_name']})"
             if ref.get("note"):
                 display += f" — {ref['note']}"
-            self.app.refs_lb.insert(tk.END, display)
-            self.app.links_map[i] = ref["element_id"]
+            self.app.refs_panel.add_item(display, ref["element_id"])
     
     def _load_dependencies(self, info):
-        self.app.deps_lb.delete(0, tk.END)
-        self.app.deps_map.clear()
-        for i, dep in enumerate(info.get("resolved_dependencies", [])):
+        self.app.deps_panel.clear()
+        for dep in info.get("resolved_dependencies", []):
             color = DEP_COLORS.get(dep["type"], "#000")
             display = f"[{dep['type']}] [{dep['status']}] {dep['name']}"
-            self.app.deps_lb.insert(tk.END, display)
-            self.app.deps_lb.itemconfig(tk.END, fg=color)
-            self.app.deps_map[i] = dep["element_id"]
+            self.app.deps_panel.add_item(display, dep["element_id"], fg=color)
     
     def _load_reverse_dependencies(self, info):
-        self.app.rev_deps_lb.delete(0, tk.END)
-        self.app.rev_deps_map.clear()
-        for i, dep in enumerate(info.get("resolved_depended_by", [])):
+        self.app.rev_deps_panel.clear()
+        for dep in info.get("resolved_depended_by", []):
             color = DEP_COLORS.get(dep["type"], "#000")
             display = f"[{dep['type']}] [{dep['status']}] {dep['name']} ({dep['list_name']})"
-            self.app.rev_deps_lb.insert(tk.END, display)
-            self.app.rev_deps_lb.itemconfig(tk.END, fg=color)
-            self.app.rev_deps_map[i] = dep["element_id"]
+            self.app.rev_deps_panel.add_item(display, dep["element_id"], fg=color)
     
     def clear_details(self):
         self.app.name_var.set("")
@@ -238,10 +230,7 @@ class DetailsLoader:
         self.app.manual_override_var.set(False)
         self.app.status_combo.config(state="readonly")
         self.app.status_preview.config(text="→ Авто: 0", fg="#616161")
-        self.app.refs_lb.delete(0, tk.END)
-        self.app.deps_lb.delete(0, tk.END)
-        self.app.rev_deps_lb.delete(0, tk.END)
-        self.app.links_map.clear()
-        self.app.deps_map.clear()
-        self.app.rev_deps_map.clear()
+        self.app.refs_panel.clear()
+        self.app.deps_panel.clear()
+        self.app.rev_deps_panel.clear()
         self.app.element_edit_state = None
