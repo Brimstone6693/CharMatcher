@@ -3,6 +3,7 @@
 Действия пользователя в Tag Hierarch - обработка команд меню и кнопок.
 """
 
+import tkinter as tk
 from tkinter import messagebox, simpledialog, filedialog
 from typing import Optional
 import os
