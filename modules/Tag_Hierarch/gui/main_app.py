@@ -34,6 +34,11 @@ class ListManagerApp(tk.Tk):
         self.deps_map: Dict[int, str] = {}
         self.rev_deps_map: Dict[int, str] = {}
         self.element_edit_state: Optional[str] = None
+        
+        # Флаги для предотвращения рекурсивных вызовов событий
+        self._updating_fields = False
+        self._updating_status = False
+        self._updating_selection = False
 
         # Инициализация обработчиков
         self.action_handler = ActionHandler(self)
@@ -314,4 +319,4 @@ class ListManagerApp(tk.Tk):
 
 if __name__ == "__main__":
     app = ListManagerApp()
-    app.root.mainloop()
+    app.mainloop()

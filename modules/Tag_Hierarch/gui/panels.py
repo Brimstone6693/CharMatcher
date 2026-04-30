@@ -176,6 +176,7 @@ class ReferencesPanel(tk.Frame):
     
     def _on_select(self, event=None):
         """Обработчик выбора элемента в списке (для подсветки)."""
+        # Пустой обработчик для предотвращения ошибок при отсутствии внешней команды
         pass
     
     def _on_add(self):
@@ -205,6 +206,4 @@ class ReferencesPanel(tk.Frame):
         if not sel:
             return None
         idx = sel[0]
-        if idx in self.links_map:
-            return self.links_map[idx]
-        return None
+        return self.links_map.get(idx)

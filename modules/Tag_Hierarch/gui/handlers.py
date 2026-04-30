@@ -19,6 +19,10 @@ class ElementStateHandler:
         """Обработчик изменения статуса в combobox."""
         if not self.app.selected_element_id or not self.app.current_list_id:
             return
+        # Защита от рекурсивного вызова
+        if self.app._updating_status:
+            return
+            
         try:
             val = int(self.app.status_var.get())
             elem = self.app.manager.lists[self.app.current_list_id].elements[self.app.selected_element_id]
@@ -39,7 +43,10 @@ class ElementStateHandler:
         """Обработчик изменения чекбокса 'Ручная настройка'."""
         if not self.app.selected_element_id or not self.app.current_list_id:
             return
-        
+        # Защита от рекурсивного вызова
+        if self.app._updating_status:
+            return
+            
         elem = self.app.manager.lists[self.app.current_list_id].elements[self.app.selected_element_id]
         
         if self.app.manual_override_var.get():
@@ -139,6 +146,9 @@ class SelectionHandler:
         sel = self.app.tree.selection()
         if not sel:
             return
+        # Защита от рекурсивного вызова
+        if self.app._updating_selection:
+            return
         if self.app.selected_element_id and self.app.current_list_id:
             self.app.save_element(silent=True)
         self.app.selected_element_id = sel[0]
@@ -155,51 +165,62 @@ class DetailsLoader:
     def load_element_details(self):
         if not self.app.selected_element_id:
             return
+        # Защита от рекурсивного вызова
+        if self.app._updating_fields:
+            return
+        
         info = self.app.manager.get_element_info(self.app.selected_element_id)
         if not info:
             return
         
-        self.app.name_var.set(info["name"])
-        self.app.desc_text.delete("1.0", tk.END)
-        self.app.desc_text.insert("1.0", info.get("description", ""))
+        # Устанавливаем флаг обновления
+        self.app._updating_fields = True
         
-        elem = self.app.manager.lists[self.app.current_list_id].elements[self.app.selected_element_id]
-        is_manual_override = elem.metadata.get("manual_override", False)
-        
-        self.app.manual_override_var.set(is_manual_override)
-        self.app.status_combo.config(state="readonly")
-        
-        cs = info.get("custom_status")
-        
-        if is_manual_override:
-            self.app.status_var.set(str(cs) if cs is not None else "0")
-            self.app.status_preview.config(
-                text=f"(ручной: {cs}) **",
-                fg=STATUS_COLORS.get(cs, "#000"),
-            )
-        elif cs is not None:
-            self.app.status_var.set(str(cs))
-            has_dependencies = len(info.get("resolved_dependencies", [])) > 0
-            if has_dependencies:
+        try:
+            self.app.name_var.set(info["name"])
+            self.app.desc_text.delete("1.0", tk.END)
+            self.app.desc_text.insert("1.0", info.get("description", ""))
+            
+            elem = self.app.manager.lists[self.app.current_list_id].elements[self.app.selected_element_id]
+            is_manual_override = elem.metadata.get("manual_override", False)
+            
+            self.app.manual_override_var.set(is_manual_override)
+            self.app.status_combo.config(state="readonly")
+            
+            cs = info.get("custom_status")
+            
+            if is_manual_override:
+                self.app.status_var.set(str(cs) if cs is not None else "0")
                 self.app.status_preview.config(
-                    text=f"(ручной: {cs}) **", 
-                    fg=STATUS_COLORS.get(cs, "#000")
+                    text=f"(ручной: {cs}) **",
+                    fg=STATUS_COLORS.get(cs, "#000"),
                 )
+            elif cs is not None:
+                self.app.status_var.set(str(cs))
+                has_dependencies = len(info.get("resolved_dependencies", [])) > 0
+                if has_dependencies:
+                    self.app.status_preview.config(
+                        text=f"(ручной: {cs}) **", 
+                        fg=STATUS_COLORS.get(cs, "#000")
+                    )
+                else:
+                    self.app.status_preview.config(
+                        text=f"(ручной: {cs})*", 
+                        fg=STATUS_COLORS.get(cs, "#000")
+                    )
             else:
+                self.app.status_var.set(str(info["status"]))
                 self.app.status_preview.config(
-                    text=f"(ручной: {cs})*", 
-                    fg=STATUS_COLORS.get(cs, "#000")
+                    text=f"→ Авто: {info['status']}",
+                    fg=STATUS_COLORS.get(info["status"], "#000"),
                 )
-        else:
-            self.app.status_var.set(str(info["status"]))
-            self.app.status_preview.config(
-                text=f"→ Авто: {info['status']}",
-                fg=STATUS_COLORS.get(info["status"], "#000"),
-            )
-        
-        self._load_references(info)
-        self._load_dependencies(info)
-        self._load_reverse_dependencies(info)
+            
+            self._load_references(info)
+            self._load_dependencies(info)
+            self._load_reverse_dependencies(info)
+        finally:
+            # Сбрасываем флаг обновления
+            self.app._updating_fields = False
     
     def _load_references(self, info):
         self.app.refs_panel.clear()
