@@ -5,7 +5,7 @@
 
 import tkinter as tk
 from tkinter import ttk
-from typing import Optional, Dict, List
+from typing import Optional
 
 
 class ScrollablePropertiesPanel(tk.Frame):
@@ -146,7 +146,8 @@ class ReferencesPanel(tk.Frame):
     def __init__(self, parent, title: str = "Ссылки"):
         super().__init__(parent)
         self.title = title
-        self.links_map: Dict[int, str] = {}
+        # Храним список кортежей (element_id, display_text)
+        self.items: list[tuple[str, str]] = []
         
         self._create_label()
         self._create_buttons()
@@ -188,15 +189,14 @@ class ReferencesPanel(tk.Frame):
             self.remove_command()
     
     def clear(self):
-        """Очищает список и маппинг."""
+        """Очищает список и внутреннее хранилище."""
         self.listbox.delete(0, tk.END)
-        self.links_map.clear()
+        self.items.clear()
     
     def add_item(self, display_text: str, element_id: str, **kwargs):
         """Добавляет элемент в список."""
+        self.items.append((element_id, display_text))
         self.listbox.insert(tk.END, display_text)
-        idx = self.listbox.size() - 1
-        self.links_map[idx] = element_id
         if kwargs.get('fg'):
             self.listbox.itemconfig(tk.END, fg=kwargs['fg'])
     
@@ -206,4 +206,19 @@ class ReferencesPanel(tk.Frame):
         if not sel:
             return None
         idx = sel[0]
-        return self.links_map.get(idx)
+        if 0 <= idx < len(self.items):
+            return self.items[idx][0]
+        return None
+    
+    def remove_selected(self):
+        """Удаляет выбранный элемент из списка и хранилища."""
+        sel = self.listbox.curselection()
+        if not sel:
+            return False
+        idx = sel[0]
+        
+        if 0 <= idx < len(self.items):
+            self.items.pop(idx)
+            self.listbox.delete(idx)
+            return True
+        return False
