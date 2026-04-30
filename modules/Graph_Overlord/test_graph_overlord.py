@@ -82,14 +82,10 @@ def test_graph():
     
     graph = InterestGraph()
     
-    # Add nodes
-    root = InterestNode(id="root", name="Root", is_category=True)
-    child1 = InterestNode(id="child1", name="Child 1")
-    child2 = InterestNode(id="child2", name="Child 2")
-    
-    graph.add_node(root)
-    graph.add_node(child1)
-    graph.add_node(child2)
+    # Add nodes using new API
+    graph.add_node("root", "Root", is_category=True)
+    graph.add_node("child1", "Child 1")
+    graph.add_node("child2", "Child 2")
     
     assert len(graph.nodes) == 3
     
@@ -129,14 +125,10 @@ def test_calculator():
     
     graph = InterestGraph()
     
-    # Create simple tree
-    root = InterestNode(id="root", name="Root", is_category=True, user_att=80.0, user_int=70.0)
-    child1 = InterestNode(id="child1", name="Child 1")
-    child2 = InterestNode(id="child2", name="Child 2")
-    
-    graph.add_node(root)
-    graph.add_node(child1)
-    graph.add_node(child2)
+    # Create simple tree using new API
+    graph.add_node("root", "Root", is_category=True, user_att=80.0, user_int=70.0)
+    graph.add_node("child1", "Child 1")
+    graph.add_node("child2", "Child 2")
     
     graph.add_edge(Edge.create_parent_edge("root", "child1"))
     graph.add_edge(Edge.create_parent_edge("root", "child2"))
@@ -149,19 +141,19 @@ def test_calculator():
     assert iterations <= 100
     
     # Check that values propagated
-    assert child1.att != 0.0 or child1.int != 0.0
-    assert child2.att != 0.0 or child2.int != 0.0
+    assert graph.nodes["child1"].att != 0.0 or graph.nodes["child1"].int != 0.0
+    assert graph.nodes["child2"].att != 0.0 or graph.nodes["child2"].int != 0.0
     
     # Values should be in valid ranges
-    assert -100 <= child1.att <= 100
-    assert 0 <= child1.int <= 100
-    assert -100 <= child2.att <= 100
-    assert 0 <= child2.int <= 100
+    assert -100 <= graph.nodes["child1"].att <= 100
+    assert 0 <= graph.nodes["child1"].int <= 100
+    assert -100 <= graph.nodes["child2"].att <= 100
+    assert 0 <= graph.nodes["child2"].int <= 100
     
     print(f"  Converged in {iterations} iterations")
-    print(f"  Root: att={root.att:.2f}, int={root.int:.2f}")
-    print(f"  Child1: att={child1.att:.2f}, int={child1.int:.2f}")
-    print(f"  Child2: att={child2.att:.2f}, int={child2.int:.2f}")
+    print(f"  Root: att={graph.nodes['root'].att:.2f}, int={graph.nodes['root'].int:.2f}")
+    print(f"  Child1: att={graph.nodes['child1'].att:.2f}, int={graph.nodes['child1'].int:.2f}")
+    print(f"  Child2: att={graph.nodes['child2'].att:.2f}, int={graph.nodes['child2'].int:.2f}")
     
     print("✓ GraphCalculator tests passed")
 
@@ -186,8 +178,7 @@ def test_templates():
     
     # Insert template into graph
     graph = InterestGraph()
-    root = InterestNode(id="root", name="My Interests", is_category=True)
-    graph.add_node(root)
+    graph.add_node("root", "My Interests", is_category=True)
     
     inserted = manager.insert_template(sports, graph, parent_node_id="root")
     
@@ -209,9 +200,8 @@ def test_full_workflow():
     manager = TemplateManager()
     manager.create_builtin_templates()
     
-    # Add root node
-    root = InterestNode(id="user_interests", name="User Interests", is_category=True)
-    graph.add_node(root)
+    # Add root node using new API
+    graph.add_node("user_interests", "User Interests", is_category=True)
     
     # Insert multiple templates
     sports_inserted = manager.insert_template(

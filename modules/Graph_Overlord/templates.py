@@ -198,7 +198,7 @@ class TemplateManager:
                 user_int=tnode.user_int,
                 active=tnode.active,
             )
-            graph.add_node(node)
+            graph.add_node_object(node)
             inserted_nodes.append(new_id)
         
         # Create edges
