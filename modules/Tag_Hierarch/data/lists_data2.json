@@ -1,0 +1,276 @@
+{
+  "lists": {
+    "7f2c06eb-8320-4af2-a1b4-7fac14008dcd": {
+      "list_id": "7f2c06eb-8320-4af2-a1b4-7fac14008dcd",
+      "name": "Список 1",
+      "description": "",
+      "elements": {
+        "f6af1013-fa58-4c82-98a8-d01e9cb67c6a": {
+          "element_id": "f6af1013-fa58-4c82-98a8-d01e9cb67c6a",
+          "name": "Элемент 1",
+          "description": "Содержится в списке 2",
+          "parent_id": null,
+          "children_ids": [],
+          "references": {
+            "55018cbe-4564-4d9e-a0f9-96ba8730268b": {
+              "list_id": "e391d363-3068-4e0b-8cd8-a5e52627a1b9",
+              "note": "Элемент 1 ↔ список 2"
+            }
+          },
+          "referenced_by": [
+            "55018cbe-4564-4d9e-a0f9-96ba8730268b"
+          ],
+          "depends_on": {},
+          "depended_by": {
+            "a286692d-787e-43f9-be6f-d80515ff67e6": "LE"
+          },
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        },
+        "a286692d-787e-43f9-be6f-d80515ff67e6": {
+          "element_id": "a286692d-787e-43f9-be6f-d80515ff67e6",
+          "name": "Элемент 2",
+          "description": "Обычный элемент",
+          "parent_id": null,
+          "children_ids": [],
+          "references": {},
+          "referenced_by": [],
+          "depends_on": {
+            "f6af1013-fa58-4c82-98a8-d01e9cb67c6a": "LE"
+          },
+          "depended_by": {},
+          "status": -3,
+          "custom_status": null,
+          "metadata": {}
+        },
+        "15a4dc3c-f19b-4483-8cb0-a38bd6a44621": {
+          "element_id": "15a4dc3c-f19b-4483-8cb0-a38bd6a44621",
+          "name": "Элемент 3",
+          "description": "Содержится в списке 3",
+          "parent_id": null,
+          "children_ids": [],
+          "references": {
+            "cf394abd-914b-4a76-8fd6-a1f02c74a86c": {
+              "list_id": "840cbdbb-217a-486f-9da6-84ecc71c9c3e",
+              "note": "Элемент 3 ↔ список 3"
+            }
+          },
+          "referenced_by": [
+            "cf394abd-914b-4a76-8fd6-a1f02c74a86c"
+          ],
+          "depends_on": {},
+          "depended_by": {},
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        },
+        "50fae39d-2d8e-4c07-8f98-3f4d9789c18c": {
+          "element_id": "50fae39d-2d8e-4c07-8f98-3f4d9789c18c",
+          "name": "Элемент 4",
+          "description": "Обычный элемент",
+          "parent_id": null,
+          "children_ids": [],
+          "references": {},
+          "referenced_by": [],
+          "depends_on": {},
+          "depended_by": {},
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        }
+      },
+      "root_elements": [
+        "f6af1013-fa58-4c82-98a8-d01e9cb67c6a",
+        "a286692d-787e-43f9-be6f-d80515ff67e6",
+        "15a4dc3c-f19b-4483-8cb0-a38bd6a44621",
+        "50fae39d-2d8e-4c07-8f98-3f4d9789c18c"
+      ]
+    },
+    "e391d363-3068-4e0b-8cd8-a5e52627a1b9": {
+      "list_id": "e391d363-3068-4e0b-8cd8-a5e52627a1b9",
+      "name": "Список 2",
+      "description": "",
+      "elements": {
+        "01fe0f9a-b72f-4ad6-a5c8-640d4aec6d21": {
+          "element_id": "01fe0f9a-b72f-4ad6-a5c8-640d4aec6d21",
+          "name": "Элемент 5",
+          "description": "Обычный элемент",
+          "parent_id": null,
+          "children_ids": [
+            "55018cbe-4564-4d9e-a0f9-96ba8730268b"
+          ],
+          "references": {},
+          "referenced_by": [],
+          "depends_on": {},
+          "depended_by": {},
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        },
+        "55018cbe-4564-4d9e-a0f9-96ba8730268b": {
+          "element_id": "55018cbe-4564-4d9e-a0f9-96ba8730268b",
+          "name": "Элемент 1 (L2)",
+          "description": "Указание на список 1",
+          "parent_id": "01fe0f9a-b72f-4ad6-a5c8-640d4aec6d21",
+          "children_ids": [],
+          "references": {
+            "f6af1013-fa58-4c82-98a8-d01e9cb67c6a": {
+              "list_id": "7f2c06eb-8320-4af2-a1b4-7fac14008dcd",
+              "note": "Элемент 1 ↔ список 2"
+            }
+          },
+          "referenced_by": [
+            "f6af1013-fa58-4c82-98a8-d01e9cb67c6a"
+          ],
+          "depends_on": {},
+          "depended_by": {},
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        },
+        "521150a0-eea3-4433-b289-e28d12f88235": {
+          "element_id": "521150a0-eea3-4433-b289-e28d12f88235",
+          "name": "Элемент 6",
+          "description": "Содержится в списке 3",
+          "parent_id": null,
+          "children_ids": [],
+          "references": {
+            "146f4176-bda8-40db-b9ac-cf8fcb39dea3": {
+              "list_id": "840cbdbb-217a-486f-9da6-84ecc71c9c3e",
+              "note": "Элемент 6 ↔ список 3"
+            }
+          },
+          "referenced_by": [
+            "146f4176-bda8-40db-b9ac-cf8fcb39dea3"
+          ],
+          "depends_on": {},
+          "depended_by": {
+            "0c35f910-8032-4e28-aece-423e930246ff": "EQ"
+          },
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        },
+        "0c35f910-8032-4e28-aece-423e930246ff": {
+          "element_id": "0c35f910-8032-4e28-aece-423e930246ff",
+          "name": "Элемент 7",
+          "description": "Обычный элемент",
+          "parent_id": null,
+          "children_ids": [],
+          "references": {},
+          "referenced_by": [],
+          "depends_on": {
+            "521150a0-eea3-4433-b289-e28d12f88235": "EQ"
+          },
+          "depended_by": {},
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        }
+      },
+      "root_elements": [
+        "01fe0f9a-b72f-4ad6-a5c8-640d4aec6d21",
+        "521150a0-eea3-4433-b289-e28d12f88235",
+        "0c35f910-8032-4e28-aece-423e930246ff"
+      ]
+    },
+    "840cbdbb-217a-486f-9da6-84ecc71c9c3e": {
+      "list_id": "840cbdbb-217a-486f-9da6-84ecc71c9c3e",
+      "name": "Список 3",
+      "description": "",
+      "elements": {
+        "ab765309-e95e-47d9-8ffc-d1936e8317fb": {
+          "element_id": "ab765309-e95e-47d9-8ffc-d1936e8317fb",
+          "name": "Элемент 8",
+          "description": "Обычный элемент",
+          "parent_id": null,
+          "children_ids": [],
+          "references": {},
+          "referenced_by": [],
+          "depends_on": {},
+          "depended_by": {},
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        },
+        "146f4176-bda8-40db-b9ac-cf8fcb39dea3": {
+          "element_id": "146f4176-bda8-40db-b9ac-cf8fcb39dea3",
+          "name": "Элемент 6 (L3)",
+          "description": "Указание на список 2",
+          "parent_id": null,
+          "children_ids": [],
+          "references": {
+            "521150a0-eea3-4433-b289-e28d12f88235": {
+              "list_id": "e391d363-3068-4e0b-8cd8-a5e52627a1b9",
+              "note": "Элемент 6 ↔ список 3"
+            }
+          },
+          "referenced_by": [
+            "521150a0-eea3-4433-b289-e28d12f88235"
+          ],
+          "depends_on": {},
+          "depended_by": {},
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        },
+        "83f76112-b4f5-4a4f-861a-4d1d1c3fb531": {
+          "element_id": "83f76112-b4f5-4a4f-861a-4d1d1c3fb531",
+          "name": "Элемент 9",
+          "description": "Обычный элемент",
+          "parent_id": null,
+          "children_ids": [],
+          "references": {},
+          "referenced_by": [],
+          "depends_on": {},
+          "depended_by": {},
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        },
+        "cf394abd-914b-4a76-8fd6-a1f02c74a86c": {
+          "element_id": "cf394abd-914b-4a76-8fd6-a1f02c74a86c",
+          "name": "Элемент 3 (L3)",
+          "description": "Указание на список 1",
+          "parent_id": null,
+          "children_ids": [],
+          "references": {
+            "15a4dc3c-f19b-4483-8cb0-a38bd6a44621": {
+              "list_id": "7f2c06eb-8320-4af2-a1b4-7fac14008dcd",
+              "note": "Элемент 3 ↔ список 3"
+            }
+          },
+          "referenced_by": [
+            "15a4dc3c-f19b-4483-8cb0-a38bd6a44621"
+          ],
+          "depends_on": {},
+          "depended_by": {},
+          "status": 0,
+          "custom_status": null,
+          "metadata": {}
+        }
+      },
+      "root_elements": [
+        "ab765309-e95e-47d9-8ffc-d1936e8317fb",
+        "146f4176-bda8-40db-b9ac-cf8fcb39dea3",
+        "83f76112-b4f5-4a4f-861a-4d1d1c3fb531",
+        "cf394abd-914b-4a76-8fd6-a1f02c74a86c"
+      ]
+    }
+  },
+  "global_elements": {
+    "f6af1013-fa58-4c82-98a8-d01e9cb67c6a": "7f2c06eb-8320-4af2-a1b4-7fac14008dcd",
+    "a286692d-787e-43f9-be6f-d80515ff67e6": "7f2c06eb-8320-4af2-a1b4-7fac14008dcd",
+    "15a4dc3c-f19b-4483-8cb0-a38bd6a44621": "7f2c06eb-8320-4af2-a1b4-7fac14008dcd",
+    "50fae39d-2d8e-4c07-8f98-3f4d9789c18c": "7f2c06eb-8320-4af2-a1b4-7fac14008dcd",
+    "01fe0f9a-b72f-4ad6-a5c8-640d4aec6d21": "e391d363-3068-4e0b-8cd8-a5e52627a1b9",
+    "55018cbe-4564-4d9e-a0f9-96ba8730268b": "e391d363-3068-4e0b-8cd8-a5e52627a1b9",
+    "521150a0-eea3-4433-b289-e28d12f88235": "e391d363-3068-4e0b-8cd8-a5e52627a1b9",
+    "0c35f910-8032-4e28-aece-423e930246ff": "e391d363-3068-4e0b-8cd8-a5e52627a1b9",
+    "ab765309-e95e-47d9-8ffc-d1936e8317fb": "840cbdbb-217a-486f-9da6-84ecc71c9c3e",
+    "146f4176-bda8-40db-b9ac-cf8fcb39dea3": "840cbdbb-217a-486f-9da6-84ecc71c9c3e",
+    "83f76112-b4f5-4a4f-861a-4d1d1c3fb531": "840cbdbb-217a-486f-9da6-84ecc71c9c3e",
+    "cf394abd-914b-4a76-8fd6-a1f02c74a86c": "840cbdbb-217a-486f-9da6-84ecc71c9c3e"
+  }
+}
