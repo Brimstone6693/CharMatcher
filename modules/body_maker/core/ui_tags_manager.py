@@ -20,12 +20,24 @@ class TagsManagerMixin:
     
     def show_tags_manager(self):
         """Создает и показывает панель менеджера тегов."""
+        # Проверяем существование виджетов перед продолжением
+        try:
+            if not hasattr(self, 'left_panel_container') or not self.left_panel_container.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        
         # Показываем левый контейнер если скрыт
         self.left_panel_container.grid()
         
         if self.tags_manager_frame is not None:
             # Если фрейм уже создан, просто показываем его
-            self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
+            try:
+                if self.tags_manager_frame.winfo_exists():
+                    self.tags_manager_frame.grid(row=1, column=0, sticky="nsew")
+            except tk.TclError:
+                return
+            
             # Скрываем список частей если он был виден (только одна вкладка активна)
             if self.parts_list_visible:
                 self.parts_list_frame.grid_remove()
@@ -128,8 +140,15 @@ class TagsManagerMixin:
                 self.tags_manager_frame.grid(row=0, column=0, sticky="nsew")
     
     def update_tags_manager_tree(self):
-        """Обновляет дерево менеджера тегов."""
+        """Обновляет дерево менеджера тегов с защитой от гонки состояний."""
         if not hasattr(self, 'tags_tree') or self.tags_tree is None:
+            return
+        
+        # Проверяем, что виджет всё ещё существует и активен
+        try:
+            if not self.tags_tree.winfo_exists():
+                return
+        except tk.TclError:
             return
         
         # Очищаем дерево
@@ -351,17 +370,37 @@ class TagsManagerMixin:
     
     def _setup_tags_drag_and_drop(self):
         """Настраивает Drag and Drop для менеджера тегов."""
-        self._drag_data = {"item": None}
+        self._drag_data = {"item": None, "start_y": 0}
         
         def on_drag_start(event):
             widget = event.widget
             item = widget.identify_row(event.y)
             if item:
+                # Сохраняем начальную позицию для определения драга
                 self._drag_data["item"] = item
+                self._drag_data["start_y"] = event.y
+                # Не перехватываем событие полностью - позволяем стандартной обработке продолжиться
                 widget.selection_set(item)
+            return  # Не возвращаем 'break', чтобы не блокировать стандартное поведение
+        
+        def on_drag_motion(event):
+            """Отслеживаем движение мыши для определения настоящего drag-and-drop"""
+            if self._drag_data["item"] is not None:
+                # Проверяем, было ли значительное перемещение
+                dy = abs(event.y - self._drag_data["start_y"])
+                if dy > 5:  # Порог в 5 пикселей для начала drag
+                    self._drag_data["dragging"] = True
+            return
         
         def on_drag_drop(event):
             widget = event.widget
+            
+            # Проверяем, был ли это настоящий drag (перемещение), а не просто клик
+            if not self._drag_data.get("dragging", False):
+                self._drag_data["item"] = None
+                self._drag_data["dragging"] = False
+                return
+            
             target_item = widget.identify_row(event.y)
             
             if self._drag_data["item"]:
@@ -379,7 +418,17 @@ class TagsManagerMixin:
                     else:
                         messagebox.showwarning("No Selection", "Please select a part in the main tree first.", parent=self.parent)
             
+            # Сбрасываем состояние
             self._drag_data["item"] = None
+            self._drag_data["dragging"] = False
         
-        self.tags_tree.bind("<ButtonPress-1>", on_drag_start)
-        self.tags_tree.bind("<ButtonRelease-1>", on_drag_drop)
+        def on_drag_leave(event):
+            """Сбрасываем состояние при уходе мыши из виджета"""
+            self._drag_data["item"] = None
+            self._drag_data["dragging"] = False
+        
+        # Используем менее инвазивные привязки
+        self.tags_tree.bind("<ButtonPress-1>", on_drag_start, add="+")
+        self.tags_tree.bind("<B1-Motion>", on_drag_motion, add="+")
+        self.tags_tree.bind("<ButtonRelease-1>", on_drag_drop, add="+")
+        self.tags_tree.bind("<Leave>", on_drag_leave, add="+")
