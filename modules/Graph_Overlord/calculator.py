@@ -333,3 +333,16 @@ class GraphCalculator:
             
             # Mark node
             node.mark_uncertain(conflict_score, weak_signal)
+    
+    def get_uncertainty(self, node_id: str) -> tuple[float, bool]:
+        """
+        Get uncertainty information for a specific node.
+        
+        Returns:
+            Tuple of (conflict_score, is_weak_signal)
+        """
+        node = self.graph.nodes.get(node_id)
+        if not node:
+            return (0.0, False)
+        
+        return (node.conflict_score or 0.0, node.weak_signal or False)
