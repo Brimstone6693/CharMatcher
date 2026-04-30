@@ -506,12 +506,21 @@ class ListManagerApp(tk.Tk):
         if not sel:
             logger.debug("on_tree_select: EXIT - no selection")
             return
-        logger.debug(f"on_tree_select: selected_element_id was {self.selected_element_id}, new={sel[0]}")
+        
+        new_id = sel[0]
+        logger.debug(f"on_tree_select: selected_element_id was {self.selected_element_id}, new={new_id}")
+        
+        # Если выбор не изменился - ничего не делаем (защита от зацикливания)
+        if self.selected_element_id == new_id:
+            logger.debug("on_tree_select: EXIT - selection unchanged")
+            return
+        
         # Автосохранение текущего элемента перед переключением
         if self.selected_element_id and self.current_list_id:
             logger.debug("on_tree_select: calling save_element(silent=True)")
             self.save_element(silent=True)
-        self.selected_element_id = sel[0]
+        
+        self.selected_element_id = new_id
         logger.debug(f"on_tree_select: calling load_element_details for {self.selected_element_id}")
         try:
             self.load_element_details()
