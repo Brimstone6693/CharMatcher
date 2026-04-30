@@ -138,6 +138,10 @@ class InterestGraph:
                     e for e in self._association_edges[edge.target_id] if e != edge
                 ]
     
+    def get_node(self, node_id: str) -> Optional[InterestNode]:
+        """Get a node by ID."""
+        return self.nodes.get(node_id)
+    
     def get_parent(self, node_id: str) -> Optional[str]:
         """Get parent node ID."""
         edge = self._parent_edges.get(node_id)
