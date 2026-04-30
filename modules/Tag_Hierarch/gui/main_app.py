@@ -322,4 +322,4 @@ class ListManagerApp(tk.Tk):
 
 if __name__ == "__main__":
     app = ListManagerApp()
-    app.root.mainloop()
+    app.mainloop()
