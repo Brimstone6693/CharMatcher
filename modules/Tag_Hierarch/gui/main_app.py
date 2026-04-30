@@ -6,6 +6,15 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, filedialog
 from typing import Dict, List, Optional
+import logging
+
+# Настройка логирования для отладки
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 from modules.Tag_Hierarch.core.models import ListManager, ItemList
 from modules.Tag_Hierarch.core.config import STATUS_COLORS, DEP_COLORS
@@ -343,24 +352,35 @@ class ListManagerApp(tk.Tk):
             self.refresh_tree()
 
     def refresh_tree(self):
+        logger.debug(f"refresh_tree START: _updating_tree={self._updating_tree}, current_list_id={self.current_list_id}")
         # Защита от рекурсивных вызовов
         if self._updating_tree:
+            logger.debug("refresh_tree: EXIT - _updating_tree is True")
             return
         self._updating_tree = True
         try:
             selected = self.tree.selection()
             selected_id = selected[0] if selected else None
+            logger.debug(f"refresh_tree: selected_id={selected_id}")
             for item in self.tree.get_children():
                 self.tree.delete(item)
             if not self.current_list_id or self.current_list_id not in self.manager.lists:
+                logger.debug("refresh_tree: EXIT - no current_list_id")
                 return
             lst = self.manager.lists[self.current_list_id]
+            logger.debug(f"refresh_tree: calling _insert_tree_children for list {lst.name}")
             self._insert_tree_children(lst, None, "")
             if selected_id and self.tree.exists(selected_id):
+                logger.debug(f"refresh_tree: restoring selection {selected_id}")
                 self.tree.selection_set(selected_id)
                 self.tree.see(selected_id)
+            logger.debug("refresh_tree: END - success")
+        except Exception as e:
+            logger.error(f"refresh_tree: ERROR: {e}", exc_info=True)
+            raise
         finally:
             self._updating_tree = False
+            logger.debug("refresh_tree: _updating_tree set to False")
 
     def _insert_tree_children(self, lst: ItemList, parent_id: Optional[str], tree_parent: str):
         element_ids = lst.root_elements if parent_id is None else lst.elements[parent_id].children_ids
@@ -390,65 +410,79 @@ class ListManagerApp(tk.Tk):
         self.element_edit_state = None
 
     def load_element_details(self):
+        logger.debug(f"load_element_details START: selected_element_id={self.selected_element_id}")
         if not self.selected_element_id:
+            logger.debug("load_element_details: EXIT - no selected_element_id")
             return
-        info = self.manager.get_element_info(self.selected_element_id)
+        try:
+            info = self.manager.get_element_info(self.selected_element_id)
+            logger.debug(f"load_element_details: got info={info is not None}")
+        except Exception as e:
+            logger.error(f"load_element_details: ERROR getting element info: {e}", exc_info=True)
+            raise
         if not info:
+            logger.debug("load_element_details: EXIT - info is None")
             return
 
-        self.name_var.set(info["name"])
-        self.desc_text.delete("1.0", tk.END)
-        self.desc_text.insert("1.0", info.get("description", ""))
+        try:
+            self.name_var.set(info["name"])
+            self.desc_text.delete("1.0", tk.END)
+            self.desc_text.insert("1.0", info.get("description", ""))
 
-        cs = info.get("custom_status")
-        # Всегда включаем ручной режим с combobox
-        self.status_combo.config(state="normal")  # Разрешён ручной ввод
-        if cs is None:
-            # Нет ручного статуса - показываем авто-статус
-            self.status_var.set(str(info["status"]))
-            self.status_preview.config(
-                text=f"→ Авто: {info['status']}",
-                fg=STATUS_COLORS.get(info["status"], "#000"),
-            )
-        else:
-            # Есть ручной статус
-            self.status_var.set(str(cs))
-            # Обновление превью с фактическим значением статуса и индикатором
-            has_dependencies = len(info.get("resolved_dependencies", [])) > 0
-            if has_dependencies:
-                self.status_preview.config(text=f"(ручной: {cs}) **", fg=STATUS_COLORS.get(cs, "#000"))
+            cs = info.get("custom_status")
+            # Всегда включаем ручной режим с combobox
+            self.status_combo.config(state="normal")  # Разрешён ручной ввод
+            if cs is None:
+                # Нет ручного статуса - показываем авто-статус
+                self.status_var.set(str(info["status"]))
+                self.status_preview.config(
+                    text=f"→ Авто: {info['status']}",
+                    fg=STATUS_COLORS.get(info["status"], "#000"),
+                )
             else:
-                self.status_preview.config(text=f"(ручной: {cs})", fg=STATUS_COLORS.get(cs, "#000"))
+                # Есть ручной статус
+                self.status_var.set(str(cs))
+                # Обновление превью с фактическим значением статуса и индикатором
+                has_dependencies = len(info.get("resolved_dependencies", [])) > 0
+                if has_dependencies:
+                    self.status_preview.config(text=f"(ручной: {cs}) **", fg=STATUS_COLORS.get(cs, "#000"))
+                else:
+                    self.status_preview.config(text=f"(ручной: {cs})", fg=STATUS_COLORS.get(cs, "#000"))
 
-        # Ссылки
-        self.refs_lb.delete(0, tk.END)
-        self.links_map.clear()
-        for i, ref in enumerate(info.get("resolved_references", [])):
-            display = f"{ref['name']} ({ref['list_name']})"
-            if ref.get("note"):
-                display += f" — {ref['note']}"
-            self.refs_lb.insert(tk.END, display)
-            self.links_map[i] = ref["element_id"]
+            # Ссылки
+            self.refs_lb.delete(0, tk.END)
+            self.links_map.clear()
+            for i, ref in enumerate(info.get("resolved_references", [])):
+                display = f"{ref['name']} ({ref['list_name']})"
+                if ref.get("note"):
+                    display += f" — {ref['note']}"
+                self.refs_lb.insert(tk.END, display)
+                self.links_map[i] = ref["element_id"]
 
-        # Зависимости (прямые)
-        self.deps_lb.delete(0, tk.END)
-        self.deps_map.clear()
-        for i, dep in enumerate(info.get("resolved_dependencies", [])):
-            color = DEP_COLORS.get(dep["type"], "#000")
-            display = f"[{dep['type']}] [{dep['status']}] {dep['name']}"
-            self.deps_lb.insert(tk.END, display)
-            self.deps_lb.itemconfig(tk.END, fg=color)
-            self.deps_map[i] = dep["element_id"]
+            # Зависимости (прямые)
+            self.deps_lb.delete(0, tk.END)
+            self.deps_map.clear()
+            for i, dep in enumerate(info.get("resolved_dependencies", [])):
+                color = DEP_COLORS.get(dep["type"], "#000")
+                display = f"[{dep['type']}] [{dep['status']}] {dep['name']}"
+                self.deps_lb.insert(tk.END, display)
+                self.deps_lb.itemconfig(tk.END, fg=color)
+                self.deps_map[i] = dep["element_id"]
 
-        # Обратные зависимости
-        self.rev_deps_lb.delete(0, tk.END)
-        self.rev_deps_map.clear()
-        for i, dep in enumerate(info.get("resolved_depended_by", [])):
-            color = DEP_COLORS.get(dep["type"], "#000")
-            display = f"[{dep['type']}] [{dep['status']}] {dep['name']} ({dep['list_name']})"
-            self.rev_deps_lb.insert(tk.END, display)
-            self.rev_deps_lb.itemconfig(tk.END, fg=color)
-            self.rev_deps_map[i] = dep["element_id"]
+            # Обратные зависимости
+            self.rev_deps_lb.delete(0, tk.END)
+            self.rev_deps_map.clear()
+            for i, dep in enumerate(info.get("resolved_depended_by", [])):
+                color = DEP_COLORS.get(dep["type"], "#000")
+                display = f"[{dep['type']}] [{dep['status']}] {dep['name']} ({dep['list_name']})"
+                self.rev_deps_lb.insert(tk.END, display)
+                self.rev_deps_lb.itemconfig(tk.END, fg=color)
+                self.rev_deps_map[i] = dep["element_id"]
+            
+            logger.debug("load_element_details: END - success")
+        except Exception as e:
+            logger.error(f"load_element_details: ERROR updating UI: {e}", exc_info=True)
+            raise
 
     def on_list_select(self, event=None):
         sel = self.lists_lb.curselection()
@@ -463,19 +497,31 @@ class ListManagerApp(tk.Tk):
         self.refresh_tree()
 
     def on_tree_select(self, event=None):
+        logger.debug(f"on_tree_select START: sel={self.tree.selection() if hasattr(self, 'tree') else 'no_tree'}, _updating_tree={self._updating_tree}")
         # Защита от рекурсивных вызовов
         if self._updating_tree:
+            logger.debug("on_tree_select: EXIT - _updating_tree is True")
             return
         sel = self.tree.selection()
         if not sel:
+            logger.debug("on_tree_select: EXIT - no selection")
             return
+        logger.debug(f"on_tree_select: selected_element_id was {self.selected_element_id}, new={sel[0]}")
         # Автосохранение текущего элемента перед переключением
         if self.selected_element_id and self.current_list_id:
+            logger.debug("on_tree_select: calling save_element(silent=True)")
             self.save_element(silent=True)
         self.selected_element_id = sel[0]
-        self.load_element_details()
+        logger.debug(f"on_tree_select: calling load_element_details for {self.selected_element_id}")
+        try:
+            self.load_element_details()
+            logger.debug("on_tree_select: load_element_details completed")
+        except Exception as e:
+            logger.error(f"on_tree_select: ERROR in load_element_details: {e}", exc_info=True)
+            raise
         # Сбрасываем индикатор несохранённых изменений после загрузки
         self.save_btn.config(bg="#e3f2fd", text="💾 Сохранить изменения")
+        logger.debug("on_tree_select: END")
 
     def add_list(self):
         name = simpledialog.askstring("Новый список", "Введите название списка:", parent=self)
@@ -557,7 +603,9 @@ class ListManagerApp(tk.Tk):
         self.refresh_tree()
 
     def save_element(self, silent=False):
+        logger.debug(f"save_element START: selected_element_id={self.selected_element_id}, current_list_id={self.current_list_id}, silent={silent}")
         if not self.selected_element_id or not self.current_list_id:
+            logger.debug("save_element: EXIT - no selected_element_id or current_list_id")
             return
         elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
 
@@ -570,19 +618,27 @@ class ListManagerApp(tk.Tk):
             val = int(self.status_var.get())
             # Проверяем, отличается ли выбранное значение от авто-статуса
             current_auto_status = elem.status
+            logger.debug(f"save_element: status_var={val}, current_auto_status={current_auto_status}")
             if val != current_auto_status:
                 elem.custom_status = max(-3, min(3, val))
+                logger.debug(f"save_element: set custom_status={elem.custom_status}")
             else:
                 # Если значение совпадает с авто-статусом, снимаем ручной статус
                 elem.custom_status = None
+                logger.debug("save_element: set custom_status=None (matches auto)")
         except ValueError:
             elem.custom_status = None
+            logger.debug("save_element: set custom_status=None (ValueError)")
 
+        logger.debug("save_element: calling _recalculate_states()")
         self.manager._recalculate_states()
         # Обновляем дерево без повторного вызова on_tree_select
+        logger.debug("save_element: calling refresh_tree()")
         self.refresh_tree()
         # Загружаем детали заново после пересчёта
+        logger.debug("save_element: calling load_element_details()")
         self.load_element_details()
+        logger.debug("save_element: END")
         # Сбросим индикатор несохранённых изменений
         self.save_btn.config(bg="#e3f2fd", text="💾 Сохранить изменения")
         if not silent:
