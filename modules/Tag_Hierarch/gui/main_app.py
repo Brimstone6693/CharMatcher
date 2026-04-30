@@ -168,7 +168,7 @@ class ListManagerApp(tk.Tk):
         self.refs_panel.links_map = self.links_map
 
         # Зависимости
-        self.deps_panel = ReferencesPanel(right_frame, text="Зависимости (элемент зависит от)")
+        self.deps_panel = ReferencesPanel(right_frame, title="Зависимости (элемент зависит от)")
         self.deps_panel.pack(fill="both", expand=True, padx=5, pady=5)
         self.deps_panel.add_command = self.add_dependency
         self.deps_panel.remove_command = self.remove_dependency
@@ -176,7 +176,7 @@ class ListManagerApp(tk.Tk):
         self.deps_panel.links_map = self.deps_map
 
         # Обратные зависимости
-        self.rev_deps_panel = ReferencesPanel(right_frame, text="Обратные зависимости (зависят от этого)")
+        self.rev_deps_panel = ReferencesPanel(right_frame, title="Обратные зависимости (зависят от этого)")
         self.rev_deps_panel.pack(fill="both", expand=True, padx=5, pady=5)
         self.rev_deps_lb = self.rev_deps_panel.listbox
         self.rev_deps_panel.links_map = self.rev_deps_map
