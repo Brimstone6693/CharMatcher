@@ -12,8 +12,13 @@ import json
 from typing import Optional
 from collections import defaultdict
 
-from .interest_node import InterestNode
-from .edge import Edge, EdgeType
+# Handle both package import and direct script execution
+try:
+    from .interest_node import InterestNode
+    from .edge import Edge, EdgeType
+except ImportError:
+    from interest_node import InterestNode
+    from edge import Edge, EdgeType
 
 
 class InterestGraph:
