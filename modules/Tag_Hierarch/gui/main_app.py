@@ -29,6 +29,8 @@ class ListManagerApp(tk.Tk):
         self.rev_deps_map: Dict[int, str] = {}
         # Отслеживание состояния изменений: None, "edited" (*), "overridden" (**)
         self.element_edit_state: Optional[str] = None
+        # Флаг для предотвращения рекурсивных вызовов при обновлении дерева
+        self._updating_tree = False
 
         self.create_menu()
         self.create_ui()
@@ -232,8 +234,7 @@ class ListManagerApp(tk.Tk):
                 elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
                 elem.custom_status = max(-3, min(3, val))
                 self.manager._recalculate_states()
-                self.refresh_tree()
-                color = STATUS_COLORS.get(val, "#000")
+                # Обновляем только индикатор редактирования, не перерисовывая дерево
                 self.update_edit_indicator()
             else:
                 self.status_preview.config(text="(вне диапазона)", fg="#f44336")
@@ -251,8 +252,7 @@ class ListManagerApp(tk.Tk):
             elem = self.manager.lists[self.current_list_id].elements[self.selected_element_id]
             elem.custom_status = max(-3, min(3, val))
             self.manager._recalculate_states()
-            self.refresh_tree()
-            color = STATUS_COLORS.get(val, "#000")
+            # Обновляем только индикатор редактирования, не перерисовывая дерево
             self.update_edit_indicator()
         except ValueError:
             self.status_preview.config(text="(ручной)", fg="#000")
@@ -343,17 +343,24 @@ class ListManagerApp(tk.Tk):
             self.refresh_tree()
 
     def refresh_tree(self):
-        selected = self.tree.selection()
-        selected_id = selected[0] if selected else None
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-        if not self.current_list_id or self.current_list_id not in self.manager.lists:
+        # Защита от рекурсивных вызовов
+        if self._updating_tree:
             return
-        lst = self.manager.lists[self.current_list_id]
-        self._insert_tree_children(lst, None, "")
-        if selected_id and self.tree.exists(selected_id):
-            self.tree.selection_set(selected_id)
-            self.tree.see(selected_id)
+        self._updating_tree = True
+        try:
+            selected = self.tree.selection()
+            selected_id = selected[0] if selected else None
+            for item in self.tree.get_children():
+                self.tree.delete(item)
+            if not self.current_list_id or self.current_list_id not in self.manager.lists:
+                return
+            lst = self.manager.lists[self.current_list_id]
+            self._insert_tree_children(lst, None, "")
+            if selected_id and self.tree.exists(selected_id):
+                self.tree.selection_set(selected_id)
+                self.tree.see(selected_id)
+        finally:
+            self._updating_tree = False
 
     def _insert_tree_children(self, lst: ItemList, parent_id: Optional[str], tree_parent: str):
         element_ids = lst.root_elements if parent_id is None else lst.elements[parent_id].children_ids
@@ -456,6 +463,9 @@ class ListManagerApp(tk.Tk):
         self.refresh_tree()
 
     def on_tree_select(self, event=None):
+        # Защита от рекурсивных вызовов
+        if self._updating_tree:
+            return
         sel = self.tree.selection()
         if not sel:
             return
@@ -569,7 +579,9 @@ class ListManagerApp(tk.Tk):
             elem.custom_status = None
 
         self.manager._recalculate_states()
+        # Обновляем дерево без повторного вызова on_tree_select
         self.refresh_tree()
+        # Загружаем детали заново после пересчёта
         self.load_element_details()
         # Сбросим индикатор несохранённых изменений
         self.save_btn.config(bg="#e3f2fd", text="💾 Сохранить изменения")
