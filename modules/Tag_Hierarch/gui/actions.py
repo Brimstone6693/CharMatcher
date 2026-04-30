@@ -3,6 +3,7 @@
 Действия пользователя в Tag Hierarch - обработка команд меню и кнопок.
 """
 
+import tkinter as tk
 from tkinter import messagebox, simpledialog, filedialog
 from typing import Optional
 import os
@@ -105,7 +106,7 @@ class ActionHandler:
         elem = self.app.manager.lists[self.app.current_list_id].elements[self.app.selected_element_id]
         
         elem.name = self.app.name_var.get().strip()
-        elem.description = self.app.desc_text.get("1.0", tk.END).strip()
+        elem.description = self.app.desc_text.get("1.0", "end").strip()
         
         try:
             val = int(self.app.status_var.get())
