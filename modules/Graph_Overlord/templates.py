@@ -162,6 +162,64 @@ class TemplateManager:
         except (FileNotFoundError, json.JSONDecodeError):
             return None
     
+    def load_template_file(self, filepath: str) -> Optional[GraphTemplate]:
+        """Alias for load_template_from_file for backwards compatibility."""
+        return self.load_template_from_file(filepath)
+    
+    def apply_template(self, template_name: str, graph: InterestGraph, parent_node_id: Optional[str] = None) -> list[str]:
+        """Apply a registered template to a graph."""
+        template = self.get_template(template_name)
+        if not template:
+            raise ValueError(f"Template '{template_name}' not found")
+        return self.insert_template(template, graph, parent_node_id)
+    
+    def export_template(self, graph: InterestGraph, template_name: str) -> GraphTemplate:
+        """Export current graph structure as a template."""
+        template = GraphTemplate(
+            name=template_name,
+            description=f"Exported from graph on {template_name}",
+            root_node_id=None,
+        )
+        
+        # Add all nodes
+        for node in graph.nodes.values():
+            tnode = TemplateNode(
+                id=node.id,
+                name=node.name,
+                is_category=node.is_category,
+                user_att=node.user_att,
+                user_int=node.user_int,
+                active=node.active,
+            )
+            template.nodes.append(tnode)
+        
+        # Add all edges
+        for edge in graph.edges:
+            tedgedata = edge.to_dict()
+            tedgedata['type'] = edge.type.value
+            tedgedata.pop('w_down_att', None)
+            tedgedata.pop('w_down_int', None)
+            tedgedata.pop('w_up_att', None)
+            tedgedata.pop('w_up_int', None)
+            tedgedata.pop('fw_att', None)
+            tedgedata.pop('fw_int', None)
+            tedgedata.pop('bw_att', None)
+            tedgedata.pop('bw_int', None)
+            
+            # Determine att_level and int_level from weights
+            if edge.type == EdgeType.PARENT:
+                tedgedata['att_level'] = 'medium_positive'
+                tedgedata['int_level'] = 'medium'
+            else:
+                tedgedata['att_level'] = 'medium_positive'
+                tedgedata['int_level'] = 'medium'
+                tedgedata['bidirectional'] = edge.bw_att > 0
+            
+            template.edges.append(TemplateEdge.from_dict(tedgedata))
+        
+        self.register_template(template)
+        return template
+    
     def save_template_to_file(self, template_name: str, filepath: str) -> bool:
         """Save a template to JSON file."""
         template = self.get_template(template_name)

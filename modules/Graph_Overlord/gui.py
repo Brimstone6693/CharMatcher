@@ -96,8 +96,7 @@ class NodeTreeview(ttk.Treeview):
             
         # Неопределённость
         uncertainty = self.calculator.get_uncertainty(node.id)
-        if uncertainty and (uncertainty.get("conflict_score", 0) > 20 or 
-                           uncertainty.get("weak_signal", False)):
+        if uncertainty and (uncertainty[0] > 20 or uncertainty[1]):
             tags.append("uncertain")
             
         # Формируем отображаемые значения
@@ -109,7 +108,9 @@ class NodeTreeview(ttk.Treeview):
             status_parts.append("🔒")
         if node.user_att is not None or node.user_int is not None:
             status_parts.append("✏️")
-        if uncertainty and uncertainty.get("needs_review", False):
+        
+        conflict_score, is_weak_signal = uncertainty
+        if conflict_score > 10.0 or is_weak_signal:
             status_parts.append("⚠️")
         status_str = " ".join(status_parts) if status_parts else ""
         
@@ -261,12 +262,13 @@ class NodeEditorFrame(ttk.LabelFrame):
         # Информация о неопределённости
         uncertainty = self.calculator.get_uncertainty(node_id)
         if uncertainty:
+            conflict_score, is_weak_signal = uncertainty
             parts = []
-            if uncertainty.get("conflict_score", 0) > 20:
-                parts.append(f"Конфликт: {uncertainty['conflict_score']:.1f}")
-            if uncertainty.get("weak_signal", False):
+            if conflict_score > 20:
+                parts.append(f"Конфликт: {conflict_score:.1f}")
+            if is_weak_signal:
                 parts.append("Слабый сигнал")
-            if uncertainty.get("needs_review", False):
+            if conflict_score > 10.0 or is_weak_signal:
                 parts.append("⚠️ Требует уточнения")
             self.uncertainty_label.config(text=" | ".join(parts) if parts else "")
         else:
@@ -520,7 +522,36 @@ class EdgeEditorFrame(ttk.LabelFrame):
         
         # Создаём связь
         try:
-            self.graph.add_edge(source_id, target_id, edge_type, **weights)
+            if edge_type == "parent":
+                edge = Edge.create_parent_edge(
+                    source_id=source_id,
+                    target_id=target_id,
+                )
+                # Обновляем веса из формы
+                if "w_down_att" in weights:
+                    edge.w_down_att = weights["w_down_att"]
+                if "w_down_int" in weights:
+                    edge.w_down_int = weights["w_down_int"]
+                if "w_up_att" in weights:
+                    edge.w_up_att = weights["w_up_att"]
+                if "w_up_int" in weights:
+                    edge.w_up_int = weights["w_up_int"]
+            else:
+                edge = Edge.create_association_edge(
+                    source_id=source_id,
+                    target_id=target_id,
+                )
+                # Обновляем веса из формы
+                if "fw_att" in weights:
+                    edge.fw_att = weights["fw_att"]
+                if "fw_int" in weights:
+                    edge.fw_int = weights["fw_int"]
+                if "bw_att" in weights:
+                    edge.bw_att = weights["bw_att"]
+                if "bw_int" in weights:
+                    edge.bw_int = weights["bw_int"]
+            
+            self.graph.add_edge(edge)
             self._refresh_node_lists()
             messagebox.showinfo("Успех", "Связь создана")
         except Exception as e:
@@ -542,7 +573,7 @@ class EdgeEditorFrame(ttk.LabelFrame):
         edge = self.graph.edges[index]
         
         if messagebox.askyesno("Подтверждение", "Удалить эту связь?"):
-            self.graph.remove_edge(edge.source_id, edge.target_id)
+            self.graph.remove_edge(edge)
             self._refresh_node_lists()
             
     def _on_edge_select(self, event):
