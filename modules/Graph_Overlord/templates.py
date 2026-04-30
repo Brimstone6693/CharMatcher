@@ -142,6 +142,10 @@ class TemplateManager:
         """Get a template by name."""
         return self.templates.get(name)
     
+    def list_templates(self) -> list[str]:
+        """List all available template names."""
+        return list(self.templates.keys())
+    
     def load_template_from_file(self, filepath: str) -> Optional[GraphTemplate]:
         """Load a template from JSON file."""
         try:
