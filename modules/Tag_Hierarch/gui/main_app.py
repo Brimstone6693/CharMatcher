@@ -683,3 +683,13 @@ class ListManagerApp(tk.Tk):
             self.refresh_lists()
             self.refresh_tree()
             messagebox.showinfo("Загрузка", "Данные загружены")
+
+
+def main():
+    """Точка входа для запуска приложения."""
+    app = ListManagerApp()
+    app.root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

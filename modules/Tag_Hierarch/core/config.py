@@ -42,3 +42,16 @@ BASE_WEIGHTS = {
     3: 5,
     None: 0,
 }
+
+
+def get_status_weight(status) -> int:
+    """Возвращает базовый вес статуса (может быть отрицательным)."""
+    return BASE_WEIGHTS.get(status, 0)
+
+
+def calculate_constraint_strength(statuses: list) -> float:
+    """Вычисляет силу ограничения как среднее арифметическое абсолютных значений базовых весов."""
+    if not statuses:
+        return 0.0
+    total = sum(abs(BASE_WEIGHTS.get(s, 0)) for s in statuses)
+    return total / len(statuses)
