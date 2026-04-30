@@ -14,10 +14,16 @@ from dataclasses import asdict
 # Добавляем родительскую директорию в путь для импорта
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from Graph_Overlord.graph import InterestGraph
-from Graph_Overlord.interest_node import InterestNode
-from Graph_Overlord.calculator import GraphCalculator
-from Graph_Overlord.templates import TemplateManager
+try:
+    from Graph_Overlord.graph import InterestGraph
+    from Graph_Overlord.interest_node import InterestNode
+    from Graph_Overlord.calculator import GraphCalculator
+    from Graph_Overlord.templates import TemplateManager
+except ImportError:
+    from graph import InterestGraph
+    from interest_node import InterestNode
+    from calculator import GraphCalculator
+    from templates import TemplateManager
 
 
 class NodeTreeview(ttk.Treeview):

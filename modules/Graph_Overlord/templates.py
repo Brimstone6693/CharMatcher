@@ -9,9 +9,15 @@ import json
 from typing import Optional
 from dataclasses import dataclass, field
 
-from .interest_node import InterestNode
-from .edge import Edge, EdgeType
-from .graph import InterestGraph
+# Handle both package import and direct script execution
+try:
+    from .interest_node import InterestNode
+    from .edge import Edge, EdgeType
+    from .graph import InterestGraph
+except ImportError:
+    from interest_node import InterestNode
+    from edge import Edge, EdgeType
+    from graph import InterestGraph
 
 
 @dataclass

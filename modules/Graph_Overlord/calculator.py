@@ -11,9 +11,15 @@ import math
 from typing import Optional
 from dataclasses import dataclass
 
-from .graph import InterestGraph
-from .interest_node import InterestNode
-from .edge import Edge, EdgeType
+# Handle both package import and direct script execution
+try:
+    from .graph import InterestGraph
+    from .interest_node import InterestNode
+    from .edge import Edge, EdgeType
+except ImportError:
+    from graph import InterestGraph
+    from interest_node import InterestNode
+    from edge import Edge, EdgeType
 
 
 @dataclass
