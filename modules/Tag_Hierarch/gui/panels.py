@@ -171,6 +171,12 @@ class ReferencesPanel(tk.Frame):
         self.listbox = tk.Listbox(self, yscrollcommand=scroll.set)
         self.listbox.pack(fill="both", expand=True, padx=2, pady=2)
         scroll.config(command=self.listbox.yview)
+        # Привязка события выбора элемента в списке
+        self.listbox.bind("<<ListboxSelect>>", self._on_select)
+    
+    def _on_select(self, event=None):
+        """Обработчик выбора элемента в списке (для подсветки)."""
+        pass
     
     def _on_add(self):
         if hasattr(self, 'add_command'):
@@ -196,6 +202,9 @@ class ReferencesPanel(tk.Frame):
     def get_selected_id(self) -> Optional[str]:
         """Возвращает ID выбранного элемента."""
         sel = self.listbox.curselection()
-        if not sel or sel[0] not in self.links_map:
+        if not sel:
             return None
-        return self.links_map[sel[0]]
+        idx = sel[0]
+        if idx in self.links_map:
+            return self.links_map[idx]
+        return None
