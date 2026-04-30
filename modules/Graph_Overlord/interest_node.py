@@ -131,6 +131,16 @@ class InterestNode:
         """Check if node needs clarification (high uncertainty)."""
         return self._conflict_score > 10.0 or self._weak_signal
     
+    @property
+    def conflict_score(self) -> float:
+        """Get conflict score."""
+        return self._conflict_score
+    
+    @property
+    def weak_signal(self) -> bool:
+        """Get weak signal flag."""
+        return self._weak_signal
+    
     def to_dict(self) -> dict:
         """Serialize node to dictionary."""
         return {
