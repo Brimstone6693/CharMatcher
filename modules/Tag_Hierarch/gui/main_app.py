@@ -622,21 +622,25 @@ class ListManagerApp(tk.Tk):
         elem.description = self.desc_text.get("1.0", tk.END).strip()
 
         # В ручном режиме сохраняем значение из combobox как custom_status
-        # Если пользователь не менял статус (combobox показывает авто-значение), custom_status остаётся None
+        # ВАЖНО: Если пользователь явно выбрал статус (не 0), сохраняем его даже если он совпадает с авто-статусом
         try:
             val = int(self.status_var.get())
-            # Проверяем, отличается ли выбранное значение от авто-статуса
             current_auto_status = elem.status
             logger.debug(f"save_element: status_var={val}, current_auto_status={current_auto_status}")
-            if val != current_auto_status:
-                elem.custom_status = max(-3, min(3, val))
-                logger.debug(f"save_element: set custom_status={elem.custom_status}")
-            else:
-                # Если значение совпадает с авто-статусом, снимаем ручной статус
+            
+            if val == 0:
+                # Выбор "Авто" - сбрасываем ручной статус
                 elem.custom_status = None
-                logger.debug("save_element: set custom_status=None (matches auto)")
+                elem.manual_override = False
+                logger.debug("save_element: set custom_status=None (Auto mode)")
+            else:
+                # Пользователь явно выбрал статус - сохраняем его принудительно
+                elem.custom_status = max(-3, min(3, val))
+                elem.manual_override = True
+                logger.debug(f"save_element: set custom_status={elem.custom_status}, manual_override=True")
         except ValueError:
             elem.custom_status = None
+            elem.manual_override = False
             logger.debug("save_element: set custom_status=None (ValueError)")
 
         logger.debug("save_element: calling _recalculate_states()")
