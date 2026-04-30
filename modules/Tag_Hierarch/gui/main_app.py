@@ -241,7 +241,12 @@ class ListManagerApp(tk.Tk):
         if not target_id or not self.selected_element_id:
             return
         self.manager.remove_reference(self.selected_element_id, target_id)
-        self.load_element_details()
+        # Обновляем детали без триггеринга событий
+        self._updating_fields = True
+        try:
+            self.load_element_details()
+        finally:
+            self._updating_fields = False
     
     def add_dependency(self):
         self.action_handler.add_dependency()
@@ -254,8 +259,13 @@ class ListManagerApp(tk.Tk):
         self.manager.remove_dependency(dep_id, self.selected_element_id)
         self.manager._recalculate_states()
         self.refresh_tree()
-        self.load_element_details()
-        self.update_edit_indicator()
+        # Обновляем детали без триггеринга событий
+        self._updating_fields = True
+        try:
+            self.load_element_details()
+            self.update_edit_indicator()
+        finally:
+            self._updating_fields = False
     
     def save_file(self):
         self.action_handler.save_file()
