@@ -164,22 +164,16 @@ class ListManagerApp(tk.Tk):
         self.refs_panel.pack(fill="both", expand=True, padx=5, pady=5)
         self.refs_panel.add_command = self.add_reference
         self.refs_panel.remove_command = self.remove_reference
-        self.refs_lb = self.refs_panel.listbox
-        self.refs_panel.links_map = self.links_map
 
         # Зависимости
         self.deps_panel = ReferencesPanel(right_frame, title="Зависимости (элемент зависит от)")
         self.deps_panel.pack(fill="both", expand=True, padx=5, pady=5)
         self.deps_panel.add_command = self.add_dependency
         self.deps_panel.remove_command = self.remove_dependency
-        self.deps_lb = self.deps_panel.listbox
-        self.deps_panel.links_map = self.deps_map
 
         # Обратные зависимости
         self.rev_deps_panel = ReferencesPanel(right_frame, title="Обратные зависимости (зависят от этого)")
         self.rev_deps_panel.pack(fill="both", expand=True, padx=5, pady=5)
-        self.rev_deps_lb = self.rev_deps_panel.listbox
-        self.rev_deps_panel.links_map = self.rev_deps_map
 
     def bind_events(self):
         self.lists_lb.bind("<<ListboxSelect>>", self._on_list_select)
@@ -241,10 +235,9 @@ class ListManagerApp(tk.Tk):
         self.action_handler.create_link()
     
     def remove_reference(self):
-        sel = self.refs_lb.curselection()
-        if not sel or sel[0] not in self.links_map:
+        target_id = self.refs_panel.get_selected_id()
+        if not target_id or not self.selected_element_id:
             return
-        target_id = self.links_map[sel[0]]
         self.manager.remove_reference(self.selected_element_id, target_id)
         self.load_element_details()
     
@@ -252,10 +245,9 @@ class ListManagerApp(tk.Tk):
         self.action_handler.add_dependency()
     
     def remove_dependency(self):
-        sel = self.deps_lb.curselection()
-        if not sel or sel[0] not in self.deps_map:
+        dep_id = self.deps_panel.get_selected_id()
+        if not dep_id or not self.selected_element_id:
             return
-        dep_id = self.deps_map[sel[0]]
         self.manager.remove_dependency(self.selected_element_id, dep_id)
         self.manager.remove_dependency(dep_id, self.selected_element_id)
         self.manager._recalculate_states()
