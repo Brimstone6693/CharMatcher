@@ -31,7 +31,8 @@ from PyQt5.QtWidgets import (
     QSlider, QSpinBox, QCheckBox, QPushButton, QStatusBar, QMenuBar, QMenu,
     QAction, QToolBar, QDialog, QDialogButtonBox, QFormLayout, QScrollArea,
     QDockWidget, QFileDialog, QMessageBox, QStyle, QStyledItemDelegate,
-    QHeaderView, QComboBox, QDoubleSpinBox, QFrame
+    QHeaderView, QComboBox, QDoubleSpinBox, QFrame, QAbstractItemView,
+    QInputDialog
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QSize, QSettings, QPoint
 from PyQt5.QtGui import QFont, QColor, QIcon
@@ -42,11 +43,17 @@ class NodeTreeWidget(QTreeWidget):
     
     node_selected = pyqtSignal(str)  # signal with node_id
     node_double_clicked = pyqtSignal(str)
+    node_context_menu_requested = pyqtSignal(QPoint, str)  # position, node_id
     
-    def __init__(self, title: str, parent=None):
+    # Типы выделения для разных окон
+    HIGHLIGHT_PRIMARY = "primary"      # Основное выделение (зелёный)
+    HIGHLIGHT_SECONDARY = "secondary"  # Вторичное выделение (синий)
+    
+    def __init__(self, title: str, highlight_type: str = HIGHLIGHT_PRIMARY, parent=None):
         super().__init__(parent)
         self.title = title
-        self.selected_node_id: Optional[str] = None
+        self.highlight_type = highlight_type  # Тип выделения для этого окна
+        self.selected_node_ids: set[str] = set()  # Множество выбранных ID узлов
         self.partner_tree: Optional['NodeTreeWidget'] = None
         self.highlighted_nodes: Dict[str, str] = {}  # node_id -> highlight_type
         
@@ -62,10 +69,11 @@ class NodeTreeWidget(QTreeWidget):
         self.setAlternatingRowColors(True)
         self.setSortingEnabled(False)
         self.setExpandsOnDoubleClick(False)
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)  # Множественное выделение
         
         # Поиск
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText(f"🔍 Поиск в {self.title}...")
+        self.search_box.setPlaceholderText(f"Поиск в {self.title}...")
         self.search_box.textChanged.connect(self._filter_nodes)
         
         # Контейнер для поиска и дерева
@@ -82,6 +90,8 @@ class NodeTreeWidget(QTreeWidget):
         # Сигналы
         self.itemClicked.connect(self._on_item_clicked)
         self.itemDoubleClicked.connect(self._on_item_double_clicked)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
         
     def set_partner_tree(self, tree: 'NodeTreeWidget'):
         """Установить партнёрское дерево для создания связей"""
@@ -91,7 +101,16 @@ class NodeTreeWidget(QTreeWidget):
         """Обработка клика по элементу"""
         node_id = item.data(0, Qt.UserRole)
         if node_id:
-            self.selected_node_id = node_id
+            # При обычном клике без Ctrl/Shift - очищаем предыдущее выделение
+            modifiers = QApplication.keyboardModifiers()
+            if not (modifiers & (Qt.ControlModifier | Qt.ShiftModifier)):
+                self.selected_node_ids.clear()
+            
+            if item.isSelected():
+                self.selected_node_ids.add(node_id)
+            else:
+                self.selected_node_ids.discard(node_id)
+                
             self.node_selected.emit(node_id)
             self._update_highlighting()
             
@@ -100,6 +119,100 @@ class NodeTreeWidget(QTreeWidget):
         node_id = item.data(0, Qt.UserRole)
         if node_id:
             self.node_double_clicked.emit(node_id)
+
+    def _show_context_menu(self, position: QPoint):
+        """Показать контекстное меню"""
+        item = self.itemAt(position)
+        if not item:
+            return
+            
+        node_id = item.data(0, Qt.UserRole)
+        if not node_id:
+            return
+        
+        # Получаем выбранные узлы для множественных операций
+        selected_ids = self.get_selected_node_ids()
+            
+        menu = QMenu(self)
+        
+        # Добавляем действия для одного узла или множественного выделения
+        if len(selected_ids) > 1:
+            # Множественное выделение
+            edit_action = menu.addAction(f"Редактировать выбранные ({len(selected_ids)})")
+            edit_action.triggered.connect(lambda: self._context_edit_multiple(selected_ids))
+            
+            delete_action = menu.addAction(f"Удалить выбранные ({len(selected_ids)})")
+            delete_action.triggered.connect(lambda: self._context_delete_multiple(selected_ids))
+            
+            menu.addSeparator()
+            
+            create_assoc_action = menu.addAction("Создать ассоциацию между выбранными")
+            create_assoc_action.triggered.connect(lambda: self._context_create_associations_between(selected_ids))
+        else:
+            # Одиночный узел
+            edit_action = menu.addAction("Редактировать узел")
+            edit_action.triggered.connect(lambda: self.node_context_menu_requested.emit(position, node_id))
+            
+            delete_action = menu.addAction("Удалить узел")
+            delete_action.triggered.connect(lambda: self._context_delete_node(node_id))
+            
+            menu.addSeparator()
+            
+            create_child_action = menu.addAction("Создать дочерний узел")
+            create_child_action.triggered.connect(lambda: self._context_create_child(node_id))
+            
+            create_assoc_action = menu.addAction("Создать ассоциацию")
+            create_assoc_action.triggered.connect(lambda: self._context_create_association(node_id))
+        
+        menu.addSeparator()
+        
+        # Общие действия
+        copy_action = menu.addAction("Копировать ID узла")
+        copy_action.triggered.connect(lambda: self._context_copy_node_id(node_id))
+        
+        menu.exec_(self.viewport().mapToGlobal(position))
+        
+    def _context_edit_multiple(self, node_ids: set[str]):
+        """Контекстное действие - редактировать несколько узлов"""
+        main_window = self.window()
+        if hasattr(main_window, '_edit_multiple_nodes'):
+            main_window._edit_multiple_nodes(node_ids)
+            
+    def _context_delete_multiple(self, node_ids: set[str]):
+        """Контекстное действие - удалить несколько узлов"""
+        main_window = self.window()
+        if hasattr(main_window, '_delete_multiple_nodes'):
+            main_window._delete_multiple_nodes(node_ids)
+            
+    def _context_create_associations_between(self, node_ids: set[str]):
+        """Контекстное действие - создать ассоциации между выбранными узлами"""
+        main_window = self.window()
+        if hasattr(main_window, '_create_associations_between'):
+            main_window._create_associations_between(node_ids)
+            
+    def _context_copy_node_id(self, node_id: str):
+        """Контекстное действие - копировать ID узла в буфер обмена"""
+        clipboard = QApplication.clipboard()
+        clipboard.setText(node_id)
+        
+    def _context_delete_node(self, node_id: str):
+        """Контекстное действие - удалить узел"""
+        # Сигнал будет обработан главным окном
+        main_window = self.window()
+        if hasattr(main_window, '_delete_node_by_id'):
+            main_window._delete_node_by_id(node_id)
+            
+    def _context_create_child(self, parent_id: str):
+        """Контекстное действие - создать дочерний узел"""
+        main_window = self.window()
+        if hasattr(main_window, '_add_node_with_parent'):
+            main_window._add_node_with_parent(parent_id)
+            
+    def _context_create_association(self, source_id: str):
+        """Контекстное действие - создать ассоциацию"""
+        main_window = self.window()
+        if hasattr(main_window, '_create_association_from_node'):
+            main_window._create_association_from_node(source_id)
             
     def _filter_nodes(self, text: str):
         """Фильтрация узлов по имени"""
@@ -160,14 +273,14 @@ class NodeTreeWidget(QTreeWidget):
         else:
             item.setIcon(0, self.style().standardIcon(QStyle.SP_FileIcon))
             
-        # Статусные иконки
-        status_icons = []
+        # Статусные иконки с текстовыми подписями
+        status_indicators = []
         if node.locked:
-            status_icons.append("🔒")
+            status_indicators.append("[Заблокирован]")
         if node.user_att is not None or node.user_int is not None:
-            status_icons.append("✏️")
-        if status_icons:
-            item.setText(0, item.text(0) + " " + " ".join(status_icons))
+            status_indicators.append("[Ручные значения]")
+        if status_indicators:
+            item.setText(0, item.text(0) + " " + " ".join(status_indicators))
         
         if parent_item:
             parent_item.addChild(item)
@@ -191,16 +304,16 @@ class NodeTreeWidget(QTreeWidget):
         for i in range(self.topLevelItemCount()):
             self._reset_item_colors(self.topLevelItem(i))
             
-        # Применение подсветки
+        # Применение подсветки в зависимости от типа выделения окна
+        primary_color = QColor(200, 230, 255)   # светло-синий для основного выделения
+        secondary_color = QColor(230, 255, 200) # светло-зелёный для вторичного выделения
+        
         for node_id, highlight_type in self.highlighted_nodes.items():
             item = self._find_item_by_node_id(node_id)
             if item:
-                if highlight_type == "outgoing":
-                    item.setBackground(0, QColor(220, 255, 220))  # светло-зелёный
-                elif highlight_type == "incoming":
-                    item.setBackground(0, QColor(255, 220, 220))  # светло-красный
-                elif highlight_type == "bidirectional":
-                    item.setBackground(0, QColor(255, 255, 200))  # жёлтый
+                # Используем разные цвета для разных окон
+                color = primary_color if self.highlight_type == self.HIGHLIGHT_PRIMARY else secondary_color
+                item.setBackground(0, color)
                     
     def _reset_item_colors(self, item: QTreeWidgetItem):
         """Сбросить цвета элемента"""
@@ -228,10 +341,19 @@ class NodeTreeWidget(QTreeWidget):
         
     def clear_selection(self):
         """Снять выделение"""
-        self.selected_node_id = None
+        self.selected_node_ids.clear()
         self.clearSelection()
         self.highlighted_nodes.clear()
         self._update_highlighting()
+
+    def get_selected_node_ids(self) -> set[str]:
+        """Получить множество ID выбранных узлов"""
+        selected = set()
+        for item in self.selectedItems():
+            node_id = item.data(0, Qt.UserRole)
+            if node_id:
+                selected.add(node_id)
+        return selected
 
 
 class TreeListPanel(QDockWidget):
@@ -256,7 +378,7 @@ class TreeListPanel(QDockWidget):
         
         # Поиск
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("🔍 Фильтр списков...")
+        self.search_box.setPlaceholderText("Фильтр списков...")
         self.search_box.textChanged.connect(self._filter_lists)
         layout.addWidget(self.search_box)
         
@@ -274,15 +396,15 @@ class TreeListPanel(QDockWidget):
         # Кнопки
         btn_layout = QHBoxLayout()
         
-        self.create_btn = QPushButton("➕ Создать")
+        self.create_btn = QPushButton("Создать")
         self.create_btn.clicked.connect(self._create_list)
         btn_layout.addWidget(self.create_btn)
         
-        self.delete_btn = QPushButton("🗑 Удалить")
+        self.delete_btn = QPushButton("Удалить")
         self.delete_btn.clicked.connect(self._delete_list)
         btn_layout.addWidget(self.delete_btn)
         
-        self.rename_btn = QPushButton("✏️ Переименовать")
+        self.rename_btn = QPushButton("Переименовать")
         self.rename_btn.clicked.connect(self._rename_list)
         btn_layout.addWidget(self.rename_btn)
         
@@ -437,7 +559,7 @@ class InspectorPanel(QDockWidget):
         weight_layout.addWidget(self.weight_label)
         weight_layout.addStretch()
         
-        self.recalc_btn = QPushButton("🔄 Пересчитать")
+        self.recalc_btn = QPushButton("Пересчитать")
         self.recalc_btn.clicked.connect(lambda: self.recalculate_requested.emit())
         weight_layout.addWidget(self.recalc_btn)
         
@@ -460,6 +582,8 @@ class InspectorPanel(QDockWidget):
         
         self.int_slider.valueChanged.connect(lambda v: self.int_spin.setValue(v / 100.0))
         self.int_spin.valueChanged.connect(lambda v: self.int_slider.setValue(int(v * 100)))
+        self.int_slider.valueChanged.connect(lambda v: self._on_int_changed())
+        self.int_spin.valueChanged.connect(lambda v: self._on_int_changed())
         
         int_layout.addWidget(QLabel("Интерес:"))
         int_layout.addWidget(self.int_slider)
@@ -479,6 +603,8 @@ class InspectorPanel(QDockWidget):
         
         self.att_slider.valueChanged.connect(lambda v: self.att_spin.setValue(v / 100.0))
         self.att_spin.valueChanged.connect(lambda v: self.att_slider.setValue(int(v * 100)))
+        self.att_slider.valueChanged.connect(lambda v: self._on_att_changed())
+        self.att_spin.valueChanged.connect(lambda v: self._on_att_changed())
         
         att_layout.addWidget(QLabel("Отношение:"))
         att_layout.addWidget(self.att_slider)
@@ -488,6 +614,13 @@ class InspectorPanel(QDockWidget):
         
         layout.addWidget(self.manual_group)
         
+        # Кнопка сохранения изменений узла (после всех полей редактирования)
+        self.save_node_btn = QPushButton("Сохранить изменения узла")
+        self.save_node_btn.clicked.connect(self._save_node_changes)
+        self.save_node_btn.setEnabled(False)
+        self.save_node_btn.setStyleSheet("QPushButton { font-weight: bold; padding: 8px; background-color: #4CAF50; color: white; } QPushButton:disabled { background-color: #cccccc; }")
+        layout.addWidget(self.save_node_btn)
+        
         # Группа "Монитор связей"
         self.monitor_group = QGroupBox("Монитор связей (0 связей)")
         monitor_layout = QVBoxLayout(self.monitor_group)
@@ -496,7 +629,7 @@ class InspectorPanel(QDockWidget):
         self.connections_list.itemClicked.connect(self._on_connection_selected)
         monitor_layout.addWidget(self.connections_list)
         
-        self.add_connection_btn = QPushButton("➕ Добавить связь")
+        self.add_connection_btn = QPushButton("Добавить связь")
         self.add_connection_btn.clicked.connect(self._add_connection)
         self.add_connection_btn.setEnabled(False)
         monitor_layout.addWidget(self.add_connection_btn)
@@ -584,15 +717,15 @@ class InspectorPanel(QDockWidget):
         # Кнопки редактора
         editor_btn_layout = QHBoxLayout()
         
-        self.sync_btn = QPushButton("🔄 Синхронизировать")
+        self.sync_btn = QPushButton("Синхронизировать")
         self.sync_btn.clicked.connect(self._show_sync_menu)
         editor_btn_layout.addWidget(self.sync_btn)
         
-        self.apply_btn = QPushButton("💾 Применить")
+        self.apply_btn = QPushButton("Применить")
         self.apply_btn.clicked.connect(self._apply_edge_changes)
         editor_btn_layout.addWidget(self.apply_btn)
         
-        self.delete_edge_btn = QPushButton("🗑 Удалить связь")
+        self.delete_edge_btn = QPushButton("Удалить связь")
         self.delete_edge_btn.clicked.connect(self._delete_edge)
         editor_btn_layout.addWidget(self.delete_edge_btn)
         
@@ -744,27 +877,58 @@ class InspectorPanel(QDockWidget):
             node = self.graph.get_node(self.current_node_id)
             if node:
                 node.name = text
-                self.node_changed.emit(self.current_node_id)
+                self._enable_save_button()
                 
     def _on_desc_changed(self):
         """Изменение описания"""
-        pass  # Можно реализовать при необходимости
+        self._enable_save_button()  # Можно реализовать при необходимости
         
     def _on_active_changed(self, state: int):
         """Изменение активности"""
-        if self.current_node_id and self.graph:
-            node = self.graph.get_node(self.current_node_id)
-            if node:
-                node.active = bool(state)
-                self.node_changed.emit(self.current_node_id)
-                
+        self._enable_save_button()
+        
     def _on_locked_changed(self, state: int):
         """Изменение блокировки"""
+        self._enable_save_button()
+
+    def _on_int_changed(self):
+        """Изменение интереса"""
+        self._enable_save_button()
+        
+    def _on_att_changed(self):
+        """Изменение отношения"""
+        self._enable_save_button()
+        
+    def _enable_save_button(self):
+        """Включить кнопку сохранения"""
+        if self.current_node_id:
+            self.save_node_btn.setEnabled(True)
+            
+    def _save_node_changes(self):
+        """Сохранить изменения узла"""
         if self.current_node_id and self.graph:
             node = self.graph.get_node(self.current_node_id)
             if node:
-                node.locked = bool(state)
+                # Сохраняем все изменения
+                node.name = self.name_edit.text()
+                node.description = self.desc_edit.toPlainText()
+                node.active = self.active_check.isChecked()
+                node.locked = self.locked_check.isChecked()
+                
+                # Сохраняем ручной режим и значения
+                if self.int_manual_check.isChecked():
+                    node.user_int = self.int_spin.value() * 100
+                else:
+                    node.user_int = None
+                    
+                if self.att_manual_check.isChecked():
+                    node.user_att = self.att_spin.value() * 200 - 100  # Преобразование в диапазон [-100, 100]
+                else:
+                    node.user_att = None
+                    
+                # Отправляем сигнал об изменении
                 self.node_changed.emit(self.current_node_id)
+                self.save_node_btn.setEnabled(False)
                 
     def _on_connection_selected(self, item: QListWidgetItem):
         """Выбор связи из списка"""
@@ -1157,10 +1321,6 @@ class CreateEdgeDialog(QDialog):
         }
 
 
-# Import QInputDialog for dialogs
-from PyQt5.QtWidgets import QInputDialog
-
-
 class MainWindow(QMainWindow):
     """Главное окно приложения"""
     
@@ -1215,12 +1375,12 @@ class MainWindow(QMainWindow):
         # Горизонтальный сплиттер для двух деревьев
         h_splitter = QSplitter(Qt.Horizontal)
         
-        # Дерево А
-        self.tree_a = NodeTreeWidget("Дерево А")
+        # Дерево А (основное выделение)
+        self.tree_a = NodeTreeWidget("Дерево А", NodeTreeWidget.HIGHLIGHT_PRIMARY)
         h_splitter.addWidget(self.tree_a.container_widget)
         
-        # Дерево Б
-        self.tree_b = NodeTreeWidget("Дерево Б")
+        # Дерево Б (вторичное выделение)
+        self.tree_b = NodeTreeWidget("Дерево Б", NodeTreeWidget.HIGHLIGHT_SECONDARY)
         h_splitter.addWidget(self.tree_b.container_widget)
         
         h_splitter.setSizes([700, 700])
@@ -1258,17 +1418,17 @@ class MainWindow(QMainWindow):
         # Файл
         file_menu = menubar.addMenu("Файл")
         
-        new_action = QAction("📁 Новый", self)
+        new_action = QAction("Новый проект", self)
         new_action.setShortcut("Ctrl+N")
         new_action.triggered.connect(self._new_project)
         file_menu.addAction(new_action)
         
-        load_action = QAction("📂 Загрузить", self)
+        load_action = QAction("Загрузить проект", self)
         load_action.setShortcut("Ctrl+O")
         load_action.triggered.connect(self._load_project)
         file_menu.addAction(load_action)
         
-        save_action = QAction("💾 Сохранить", self)
+        save_action = QAction("Сохранить проект", self)
         save_action.setShortcut("Ctrl+S")
         save_action.triggered.connect(self._save_project)
         file_menu.addAction(save_action)
@@ -1282,12 +1442,12 @@ class MainWindow(QMainWindow):
         # Правка
         edit_menu = menubar.addMenu("Правка")
         
-        undo_action = QAction("↩ Отменить", self)
+        undo_action = QAction("Отменить", self)
         undo_action.setShortcut("Ctrl+Z")
         undo_action.triggered.connect(self._undo)
         edit_menu.addAction(undo_action)
         
-        redo_action = QAction("↪ Повторить", self)
+        redo_action = QAction("Повторить", self)
         redo_action.setShortcut("Ctrl+Y")
         redo_action.triggered.connect(self._redo)
         edit_menu.addAction(redo_action)
@@ -1301,7 +1461,7 @@ class MainWindow(QMainWindow):
         # Расчёт
         calc_menu = menubar.addMenu("Расчёт")
         
-        recalc_action = QAction("🔄 Перерасчёт весов", self)
+        recalc_action = QAction("Перерасчёт весов", self)
         recalc_action.setShortcut("F5")
         recalc_action.triggered.connect(self._recalculate)
         calc_menu.addAction(recalc_action)
@@ -1313,12 +1473,12 @@ class MainWindow(QMainWindow):
         # Вид
         view_menu = menubar.addMenu("Вид")
         
-        templates_action = QAction("📋 Показать шаблоны", self)
+        templates_action = QAction("Шаблоны", self)
         templates_action.setShortcut("Ctrl+T")
         templates_action.triggered.connect(self._toggle_templates)
         view_menu.addAction(templates_action)
         
-        dark_theme_action = QAction("🌓 Тёмная тема", self)
+        dark_theme_action = QAction("Тёмная тема", self)
         dark_theme_action.triggered.connect(self._toggle_dark_theme)
         view_menu.addAction(dark_theme_action)
         
@@ -1331,11 +1491,11 @@ class MainWindow(QMainWindow):
         # Помощь
         help_menu = menubar.addMenu("Помощь")
         
-        about_action = QAction("ℹ️ О программе", self)
+        about_action = QAction("О программе", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
         
-        docs_action = QAction("📖 Документация", self)
+        docs_action = QAction("Документация", self)
         docs_action.triggered.connect(self._show_docs)
         help_menu.addAction(docs_action)
         
@@ -1345,19 +1505,41 @@ class MainWindow(QMainWindow):
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
         
-        toolbar.addAction("📁", self._new_project)
-        toolbar.addAction("💾", self._save_project)
-        toolbar.addAction("↩", self._undo)
-        toolbar.addAction("↪", self._redo)
+        new_action = toolbar.addAction("Новый", self._new_project)
+        new_action.setToolTip("Создать новый проект")
+        
+        save_action = toolbar.addAction("Сохранить", self._save_project)
+        save_action.setToolTip("Сохранить проект")
+        
+        undo_action = toolbar.addAction("Отменить", self._undo)
+        undo_action.setToolTip("Отменить последнее действие")
+        
+        redo_action = toolbar.addAction("Повторить", self._redo)
+        redo_action.setToolTip("Повторить отменённое действие")
+        
         toolbar.addSeparator()
-        toolbar.addAction("➕", self._add_node)
-        toolbar.addAction("🗑", self._delete_node)
+        
+        add_node_action = toolbar.addAction("Добавить узел", self._add_node)
+        add_node_action.setToolTip("Добавить новый узел")
+        
+        delete_node_action = toolbar.addAction("Удалить узел", self._delete_node)
+        delete_node_action.setToolTip("Удалить выбранный узел")
+        
         toolbar.addSeparator()
-        toolbar.addAction("🔄", self._recalculate)
-        toolbar.addAction("🔍", self._search_project)
+        
+        recalc_action = toolbar.addAction("Пересчитать", self._recalculate)
+        recalc_action.setToolTip("Пересчитать веса графа")
+        
+        search_action = toolbar.addAction("Поиск", self._search_project)
+        search_action.setToolTip("Поиск по проекту")
+        
         toolbar.addSeparator()
-        toolbar.addAction("🌓", self._toggle_dark_theme)
-        toolbar.addAction("❓", self._show_about)
+        
+        theme_action = toolbar.addAction("Тема", self._toggle_dark_theme)
+        theme_action.setToolTip("Переключить тёмную/светлую тему")
+        
+        about_action = toolbar.addAction("О программе", self._show_about)
+        about_action.setToolTip("Информация о программе")
         
     def _setup_statusbar(self):
         """Настройка статус-бара"""
